@@ -175,3 +175,10 @@ def test_analyze_pages_treats_empty_pages_as_failed():
     )
     result = make_tools(http=http).analyze_pages(["https://empty.example.com"])
     assert result == {"error": "none of the pages could be fetched", "failed": ["https://empty.example.com"]}
+
+
+def test_only_search_and_analyze_are_exposed_to_the_model():
+    from aueb_agents_ca.tools import TOOL_SCHEMAS
+
+    assert list(make_tools().registry) == ["search_reviews", "analyze_pages"]
+    assert [schema["function"]["name"] for schema in TOOL_SCHEMAS] == ["search_reviews", "analyze_pages"]

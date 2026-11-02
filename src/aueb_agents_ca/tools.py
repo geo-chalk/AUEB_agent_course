@@ -62,7 +62,7 @@ class ReviewTools:
         self.search = search
         self.pages: dict[str, str] = {}  # url -> text, so the model can refer to a page by its URL
 
-    # ----- the three tools the agent sees -----
+    # ----- the two tools the agent sees -----
 
     def search_reviews(self, query: str, max_results: int = 10) -> list[dict] | str:
         """Web search, exactly as queried. Returns title, url and snippet per result."""
@@ -75,7 +75,11 @@ class ReviewTools:
         return [{"title": r["title"], "url": r["href"], "snippet": r["body"]} for r in results]
 
     def fetch_page(self, url: str, max_chars: int = 20000) -> str:
-        """Download a web page and return its readable text, cut to max_chars."""
+        """Download a web page and return its readable text, cut to max_chars.
+
+        Not exposed to the model: given the choice, a small model sometimes reads pages instead of
+        analysing them. analyze_pages calls this internally.
+        """
         try:
             response = self.http.get(url)
             response.raise_for_status()  # turns 403, 404, 500 ... into an exception
@@ -103,11 +107,7 @@ class ReviewTools:
     @property
     def registry(self) -> dict[str, Callable]:
         """Tool name -> function, so the agent loop can run what the model asks for."""
-        return {
-            "search_reviews": self.search_reviews,
-            "fetch_page": self.fetch_page,
-            "analyze_pages": self.analyze_pages,
-        }
+        return {"search_reviews": self.search_reviews, "analyze_pages": self.analyze_pages}
 
     # ----- building blocks of the analysis -----
 
@@ -208,18 +208,6 @@ TOOL_SCHEMAS = [
                     "max_results": {"type": "integer"},
                 },
                 "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "fetch_page",
-            "description": "Download one web page and return its readable text. Use only when you need to read a page yourself.",
-            "parameters": {
-                "type": "object",
-                "properties": {"url": {"type": "string"}},
-                "required": ["url"],
             },
         },
     },
