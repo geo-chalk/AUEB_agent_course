@@ -1,0 +1,32 @@
+"""Configuration, read once from the environment and passed to whoever needs it."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+@dataclass(frozen=True)
+class Settings:
+    base_url: str
+    api_key: str
+    model: str
+    embedding_model: str | None = None  # None: skip the embedding-based aspect merge
+
+    @classmethod
+    def from_env(cls, dotenv_path: str | Path | None = None) -> Settings:
+        """Build settings from environment variables.
+
+        Loads a .env file first: the one at `dotenv_path` if given, otherwise the nearest .env found
+        by walking up from the current directory. Variables already set in the environment win.
+        """
+        load_dotenv(dotenv_path)
+        return cls(
+            base_url=os.environ["LLM_BASE_URL"],
+            api_key=os.environ["LLM_API_KEY"],
+            model=os.environ["LLM_MODEL"],
+            embedding_model=os.environ.get("EMBEDDING_MODEL") or None,
+        )

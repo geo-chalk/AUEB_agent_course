@@ -1,0 +1,57 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='405' viewBox='0 0 1000 405'>
+<defs><marker id='a' markerWidth='8' markerHeight='8' refX='7' refY='4' orient='auto'><path d='M0,0 L8,4 L0,8 z' fill='#6b7280'/></marker></defs>
+<rect width='1000' height='405' fill='#ffffff'/>
+<rect x='30' y='40' width='150' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='105.0' y='64' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>messages</text>
+<text x='105.0' y='82' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>list of role + content</text>
+<rect x='214' y='40' width='150' height='56' rx='8' fill='#2563eb' stroke='none' stroke-width='1.5'/>
+<text x='289.0' y='73' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#ffffff'>① chat template</text>
+<rect x='398' y='40' width='150' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='473.0' y='64' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>one string</text>
+<text x='473.0' y='82' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>with special tokens</text>
+<rect x='582' y='40' width='150' height='56' rx='8' fill='#2563eb' stroke='none' stroke-width='1.5'/>
+<text x='657.0' y='73' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#ffffff'>② tokeniser</text>
+<rect x='766' y='40' width='150' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='841.0' y='64' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>token ids</text>
+<text x='841.0' y='82' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>[200006, 17360, …]</text>
+<path d='M180,68.0 L212,68.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M364,68.0 L396,68.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M548,68.0 L580,68.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M732,68.0 L764,68.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<text x='841.0' y='28' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>usage.prompt_tokens = len(ids)</text>
+<rect x='30' y='180' width='150' height='56' rx='8' fill='#2563eb' stroke='none' stroke-width='1.5'/>
+<text x='105.0' y='204' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#ffffff'>③ forward pass</text>
+<text x='105.0' y='222' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#ffffff' opacity='0.9'>the transformer</text>
+<rect x='214' y='180' width='150' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='289.0' y='204' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>P(next token)</text>
+<text x='289.0' y='222' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>over the whole vocabulary</text>
+<rect x='398' y='180' width='150' height='56' rx='8' fill='#2563eb' stroke='none' stroke-width='1.5'/>
+<text x='473.0' y='204' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#ffffff'>④ pick one token</text>
+<text x='473.0' y='222' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#ffffff' opacity='0.9'>argmax or sample</text>
+<rect x='582' y='180' width='150' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='657.0' y='204' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>append it</text>
+<text x='657.0' y='222' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>to the token ids</text>
+<path d='M180,208.0 L212,208.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M364,208.0 L396,208.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M548,208.0 L580,208.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M841.0,96 L841.0,136 L105.0,136 L105.0,178' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M657.0,180 L657.0,136' fill='none' stroke='#6b7280' stroke-width='2' stroke-dasharray='5 4'/>
+<text x='665.0' y='160' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>no stop token yet: run again</text>
+<text x='381.0' y='128' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>one loop iteration = one new token</text>
+<text x='766' y='202' text-anchor='start' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>usage.completion_tokens =</text>
+<text x='766' y='220' text-anchor='start' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>number of iterations</text>
+<text x='766' y='238' text-anchor='start' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>(reasoning + answer)</text>
+<path d='M657.0,236 L657.0,358.0 L550,358.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<text x='665.0' y='266' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>stop token or max_tokens reached</text>
+<rect x='398' y='330' width='150' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='473.0' y='354' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>generated ids</text>
+<text x='473.0' y='372' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>the new tokens only</text>
+<rect x='214' y='330' width='150' height='56' rx='8' fill='#2563eb' stroke='none' stroke-width='1.5'/>
+<text x='289.0' y='354' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#ffffff'>⑤ detokeniser</text>
+<text x='289.0' y='372' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#ffffff' opacity='0.9'>ids → text</text>
+<rect x='30' y='330' width='150' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='105.0' y='354' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>response JSON</text>
+<text x='105.0' y='372' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>reasoning, content, usage</text>
+<path d='M398,358.0 L366,358.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M214,358.0 L182,358.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+</svg>

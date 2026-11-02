@@ -1,0 +1,28 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='900' height='300' viewBox='0 0 900 300'>
+<defs><marker id='a' markerWidth='8' markerHeight='8' refX='7' refY='4' orient='auto'><path d='M0,0 L8,4 L0,8 z' fill='#6b7280'/></marker></defs>
+<rect width='900' height='300' fill='#ffffff'/>
+<rect x='30' y='60' width='160' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='110.0' y='84' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>messages</text>
+<text x='110.0' y='102' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>system prompt + task</text>
+<rect x='240' y='60' width='160' height='56' rx='8' fill='#2563eb' stroke='none' stroke-width='1.5'/>
+<text x='320.0' y='84' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#ffffff'>model call</text>
+<text x='320.0' y='102' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#ffffff' opacity='0.9'>messages + tool schemas</text>
+<rect x='450' y='60' width='160' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='530.0' y='84' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>tool calls?</text>
+<text x='530.0' y='102' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>finish_reason</text>
+<rect x='700' y='60' width='160' height='56' rx='8' fill='#f3f4f6' stroke='#9ca3af' stroke-width='1.5'/>
+<text x='780.0' y='84' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#111827'>final answer</text>
+<text x='780.0' y='102' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#111827' opacity='0.9'>message.content</text>
+<path d='M190,88.0 L238,88.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M400,88.0 L448,88.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<path d='M610,88.0 L698,88.0' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<text x='655.0' y='80.0' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>no</text>
+<rect x='300' y='190' width='310' height='56' rx='8' fill='#2563eb' stroke='none' stroke-width='1.5'/>
+<text x='455.0' y='214' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='14' font-weight='600' fill='#ffffff'>run each tool</text>
+<text x='455.0' y='232' text-anchor='middle' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' fill='#ffffff' opacity='0.9'>append results as tool messages</text>
+<path d='M530.0,116 L530.0,188' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<text x='538.0' y='156' text-anchor='start' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>yes</text>
+<path d='M300,218.0 L320.0,218.0 L320.0,118' fill='none' stroke='#6b7280' stroke-width='2' marker-end='url(#a)'/>
+<text x='312.0' y='258.0' text-anchor='start' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>the whole conversation is sent again:</text>
+<text x='312.0' y='276.0' text-anchor='start' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12' font-style='italic' fill='#6b7280'>one iteration = one model call, stopped by max_steps</text>
+</svg>
