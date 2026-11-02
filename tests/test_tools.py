@@ -47,7 +47,7 @@ def test_search_keeps_only_title_url_snippet():
         {
             "title": "A review",
             "url": "https://example.com/review",
-            "snippet": "snippet for Sony WH-1000XM5 reviews",
+            "snippet": "snippet for Sony WH-1000XM5",
         }
     ]
 
@@ -163,12 +163,10 @@ def test_merge_aspects_embeds_only_the_most_frequent_names():
     assert len(mapping) == 12
 
 
-def test_search_does_not_double_the_word_reviews():
+def test_search_runs_the_query_exactly_as_given():
     search = FakeSearch()
-    tools = make_tools(search=search)
-    tools.search_reviews("Sony WH-1000XM5")
-    tools.search_reviews("Sony WH-1000XM5 long term review")
-    assert search.queries == ["Sony WH-1000XM5 reviews", "Sony WH-1000XM5 long term review"]
+    make_tools(search=search).search_reviews("Sony WH-1000XM5 long term review")
+    assert search.queries == ["Sony WH-1000XM5 long term review"]  # no silent rewriting
 
 
 def test_analyze_pages_treats_empty_pages_as_failed():

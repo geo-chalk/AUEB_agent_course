@@ -65,9 +65,7 @@ class ReviewTools:
     # ----- the three tools the agent sees -----
 
     def search_reviews(self, query: str, max_results: int = 10) -> list[dict] | str:
-        """Search the web for reviews of a product. Returns title, url and snippet per result."""
-        if "review" not in query.lower():  # the model often adds the word itself
-            query = f"{query} reviews"
+        """Web search, exactly as queried. Returns title, url and snippet per result."""
         try:
             results = self.search.text(query, max_results=max_results)
         except DDGSException as e:
@@ -196,15 +194,16 @@ TOOL_SCHEMAS = [
         "function": {
             "name": "search_reviews",
             "description": (
-                "Search the web for reviews of a product. Returns title, url and snippet per result, about ten "
-                "per query at most. Run several differently worded searches to find more pages."
+                "Web search, run exactly as queried: phrase the query to find review pages, e.g. "
+                "'<product> review'. Returns title, url and snippet per result, about ten per query at most. "
+                "Run several differently worded searches to find more pages."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The product name, optionally with extra words such as 'long term' or 'vs <rival>'",
+                        "description": "The search query, e.g. '<product> review', '<product> long term review', '<product> vs <rival>'",
                     },
                     "max_results": {"type": "integer"},
                 },
