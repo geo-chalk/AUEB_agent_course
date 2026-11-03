@@ -22,7 +22,7 @@ def make_client() -> httpx.Client:
     return httpx.Client(base_url=api_url())
 
 
-def api_health(client: httpx.Client) -> tuple[dict | None, float]:
+def api_health(*, client: httpx.Client) -> tuple[dict | None, float]:
     """The API's /health and how long it took in milliseconds, or (None, elapsed) when it cannot be reached."""
     t0 = time.perf_counter()
     try:
@@ -32,7 +32,7 @@ def api_health(client: httpx.Client) -> tuple[dict | None, float]:
     return data, (time.perf_counter() - t0) * 1000
 
 
-def summarise(client: httpx.Client, product: str, max_steps: int = 8) -> tuple[dict, str]:
+def summarise(*, client: httpx.Client, product: str, max_steps: int = 8) -> tuple[dict, str]:
     """POST /summarise. Returns the response body and the request id the API tagged the call with."""
     response = client.post(
         "/summarise", json={"product": product, "max_steps": max_steps}, timeout=AGENT_TIMEOUT
@@ -41,14 +41,14 @@ def summarise(client: httpx.Client, product: str, max_steps: int = 8) -> tuple[d
     return response.json(), response.headers.get("X-Request-ID", "-")
 
 
-def ask(client: httpx.Client, task: str, max_steps: int = 8) -> tuple[dict, str]:
+def ask(*, client: httpx.Client, task: str, max_steps: int = 8) -> tuple[dict, str]:
     """POST /ask. Returns the response body and the request id."""
     response = client.post("/ask", json={"task": task, "max_steps": max_steps}, timeout=AGENT_TIMEOUT)
     response.raise_for_status()
     return response.json(), response.headers.get("X-Request-ID", "-")
 
 
-def stream_summarise(client: httpx.Client, product: str, max_steps: int = 8) -> Iterator[dict]:
+def stream_summarise(*, client: httpx.Client, product: str, max_steps: int = 8) -> Iterator[dict]:
     """POST /summarise/stream and yield each line as it arrives: {"log": ...} while the agent runs, then
     {"result": ...} or {"error": ...}. Every event also carries the request id."""
     with client.stream(

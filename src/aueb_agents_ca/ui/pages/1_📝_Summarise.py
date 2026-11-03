@@ -19,7 +19,7 @@ EXAMPLES = [
 ]
 
 client = make_client()
-health, _ = api_health(client)
+health, _ = api_health(client=client)
 if health is None:
     st.error(f"The API at `{api_url()}` is not reachable. Start it with `docker compose up api`.")
     st.stop()
@@ -43,7 +43,7 @@ if st.button("Summarise", type="primary", disabled=not product):
     with st.status("Running the agent: searching, reading and analysing reviews...", expanded=True) as status:
         log_box = st.empty()
         try:
-            for event in stream_summarise(client, product, max_steps):
+            for event in stream_summarise(client=client, product=product, max_steps=max_steps):
                 request_id = event["request_id"]
                 if "log" in event:
                     lines.append(event["log"])

@@ -9,7 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Settings:
     base_url: str
     api_key: str
@@ -19,7 +19,7 @@ class Settings:
     log_dir: str | None = "logs"  # where the rotating log file goes; None: stdout only
 
     @classmethod
-    def from_env(cls, dotenv_path: str | Path | None = None) -> Settings:
+    def from_env(cls, *, dotenv_path: str | Path | None = None) -> Settings:
         """Build settings from environment variables.
 
         Loads a .env file first: the one at `dotenv_path` if given, otherwise the nearest .env found

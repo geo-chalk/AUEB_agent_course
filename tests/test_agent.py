@@ -9,10 +9,15 @@ from aueb_agents_ca.agent import run_agent
 
 def test_loop_runs_the_requested_tool_then_returns_the_answer():
     llm = ScriptedLLM(
-        [message(tool_calls=[tool_call("search_reviews", query="XM5 review")]), message(content="done")]
+        script=[
+            message(tool_calls=[tool_call(name="search_reviews", query="XM5 review")]),
+            message(content="done"),
+        ]
     )
 
-    answer, conversation = run_agent("Summarise XM5 reviews", llm, FAKE_TOOLS, "fake-model")
+    answer, conversation = run_agent(
+        task="Summarise XM5 reviews", llm=llm, tools=FAKE_TOOLS, model="fake-model"
+    )
 
     assert answer == "done"
     assert len(llm.calls) == 2  # one call asked for the tool, one produced the answer
@@ -23,19 +28,21 @@ def test_loop_runs_the_requested_tool_then_returns_the_answer():
 
 
 def test_loop_stops_after_max_steps():
-    llm = ScriptedLLM([message(tool_calls=[tool_call("search_reviews", query="x")])] * 3)
+    llm = ScriptedLLM(script=[message(tool_calls=[tool_call(name="search_reviews", query="x")])] * 3)
 
-    answer, _ = run_agent("task", llm, FAKE_TOOLS, "fake-model", max_steps=3)
+    answer, _ = run_agent(task="task", llm=llm, tools=FAKE_TOOLS, model="fake-model", max_steps=3)
 
     assert answer.startswith("Stopped")
     assert len(llm.calls) == 3
 
 
 def test_loop_logs_every_model_call_and_tool_call(caplog):
-    llm = ScriptedLLM([message(tool_calls=[tool_call("search_reviews", query="x")]), message(content="done")])
+    llm = ScriptedLLM(
+        script=[message(tool_calls=[tool_call(name="search_reviews", query="x")]), message(content="done")]
+    )
 
     with caplog.at_level("INFO"):
-        run_agent("task", llm, FAKE_TOOLS, "fake-model")
+        run_agent(task="task", llm=llm, tools=FAKE_TOOLS, model="fake-model")
 
     assert "agent start: task='task' model=fake-model" in caplog.text
     assert "step 0: model asks for search_reviews" in caplog.text

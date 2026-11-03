@@ -11,7 +11,7 @@ from aueb_agents_ca.ui.client import api_health, ask, stream_summarise, summaris
 UI_DIR = Path(ui_package.__file__).parent
 
 
-def fake_api(handler):
+def fake_api(*, handler):
     return httpx.Client(base_url="http://api", transport=httpx.MockTransport(handler))
 
 
@@ -20,9 +20,9 @@ def test_summarise_and_ask_return_the_body_and_the_request_id():
         body = {"summary": "# ok", "answer": "yes", "steps": 3, "model": "m"}
         return httpx.Response(200, json=body, headers={"X-Request-ID": "abc12345"})
 
-    body, request_id = summarise(fake_api(handler), "XM5")
+    body, request_id = summarise(client=fake_api(handler=handler), product="XM5")
     assert body["summary"] == "# ok" and request_id == "abc12345"
-    body, request_id = ask(fake_api(handler), "Is it good?")
+    body, request_id = ask(client=fake_api(handler=handler), task="Is it good?")
     assert body["answer"] == "yes" and request_id == "abc12345"
 
 
@@ -30,7 +30,7 @@ def test_health_is_none_when_the_api_is_down():
     def handler(request):
         raise httpx.ConnectError("refused")
 
-    health, latency_ms = api_health(fake_api(handler))
+    health, latency_ms = api_health(client=fake_api(handler=handler))
     assert health is None and latency_ms >= 0
 
 
@@ -47,6 +47,6 @@ def test_stream_summarise_yields_log_lines_then_the_result():
         body = b'{"log": "10:00:00 agent start"}\n{"log": "10:00:01 step 0"}\n{"result": {"summary": "# ok", "steps": 2, "model": "m"}}\n'
         return httpx.Response(200, content=body, headers={"X-Request-ID": "abc12345"})
 
-    events = list(stream_summarise(fake_api(handler), "XM5"))
+    events = list(stream_summarise(client=fake_api(handler=handler), product="XM5"))
     assert [e.get("log") for e in events[:2]] == ["10:00:00 agent start", "10:00:01 step 0"]
     assert events[-1]["result"]["summary"] == "# ok" and events[-1]["request_id"] == "abc12345"

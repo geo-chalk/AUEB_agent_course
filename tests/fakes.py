@@ -4,12 +4,12 @@ import json
 from types import SimpleNamespace
 
 
-def tool_call(name: str, **args) -> SimpleNamespace:
+def tool_call(*, name: str, **args) -> SimpleNamespace:
     """What the model sends when it wants a tool run: an id, the tool name and JSON arguments."""
     return SimpleNamespace(id="call_1", function=SimpleNamespace(name=name, arguments=json.dumps(args)))
 
 
-def message(content: str | None = None, tool_calls: list | None = None) -> SimpleNamespace:
+def message(*, content: str | None = None, tool_calls: list | None = None) -> SimpleNamespace:
     """A model message: either text (the final answer) or tool calls."""
     return SimpleNamespace(content=content, tool_calls=tool_calls)
 
@@ -17,7 +17,7 @@ def message(content: str | None = None, tool_calls: list | None = None) -> Simpl
 class ScriptedLLM:
     """Plays back a script of messages, one per call, so a test decides what the 'model' does."""
 
-    def __init__(self, script: list[SimpleNamespace]) -> None:
+    def __init__(self, *, script: list[SimpleNamespace]) -> None:
         self.calls: list[dict] = []
         responses = [
             SimpleNamespace(choices=[SimpleNamespace(message=m, finish_reason="stop")]) for m in script

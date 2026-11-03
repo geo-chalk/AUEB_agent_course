@@ -17,7 +17,10 @@ def test_health_and_summarise_with_fake_dependencies(monkeypatch):
 
     with TestClient(app) as client:  # 'with' runs the lifespan (startup and shutdown)
         client.app.state.llm = ScriptedLLM(
-            [message(tool_calls=[tool_call("search_reviews", query="x")]), message(content="a summary")]
+            script=[
+                message(tool_calls=[tool_call(name="search_reviews", query="x")]),
+                message(content="a summary"),
+            ]
         )
         health = client.get("/health").json()
         assert health["status"] == "ok" and health["model"] == "fake-model"
@@ -41,7 +44,7 @@ def test_summarise_logs_what_happened(monkeypatch, caplog):
     monkeypatch.setenv("LLM_MODEL", "fake-model")
     app.dependency_overrides[get_tools] = lambda: FAKE_TOOLS
     with TestClient(app) as client, caplog.at_level("INFO"):
-        client.app.state.llm = ScriptedLLM([message(content="a summary")])
+        client.app.state.llm = ScriptedLLM(script=[message(content="a summary")])
         client.post("/summarise", json={"product": "XM5"})
     app.dependency_overrides.clear()
 
@@ -55,7 +58,7 @@ def test_ask_runs_the_agent_on_a_free_form_task(monkeypatch):
     monkeypatch.setenv("LLM_MODEL", "fake-model")
     app.dependency_overrides[get_tools] = lambda: FAKE_TOOLS
     with TestClient(app) as client:
-        client.app.state.llm = ScriptedLLM([message(content="Reviewers dislike the price.")])
+        client.app.state.llm = ScriptedLLM(script=[message(content="Reviewers dislike the price.")])
         response = client.post("/ask", json={"task": "What do reviewers dislike about the XM5?"})
         health = client.get("/health").json()
     app.dependency_overrides.clear()
@@ -72,7 +75,10 @@ def test_summarise_stream_sends_log_lines_then_the_result(monkeypatch):
     app.dependency_overrides[get_tools] = lambda: FAKE_TOOLS
     with TestClient(app) as client:
         client.app.state.llm = ScriptedLLM(
-            [message(tool_calls=[tool_call("search_reviews", query="x")]), message(content="a summary")]
+            script=[
+                message(tool_calls=[tool_call(name="search_reviews", query="x")]),
+                message(content="a summary"),
+            ]
         )
         with client.stream("POST", "/summarise/stream", json={"product": "XM5"}) as response:
             assert response.headers["content-type"].startswith("application/x-ndjson")

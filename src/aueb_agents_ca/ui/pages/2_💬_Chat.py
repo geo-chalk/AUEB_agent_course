@@ -13,7 +13,7 @@ st.caption(
 )
 
 client = make_client()
-health, _ = api_health(client)
+health, _ = api_health(client=client)
 if health is None:
     st.error(f"The API at `{api_url()}` is not reachable. Start it with `docker compose up api`.")
     st.stop()
@@ -48,7 +48,7 @@ if task := st.chat_input("Ask about the reviews of a product"):
     with st.chat_message("assistant"):
         with st.spinner("Running the agent (about a minute)..."):
             try:
-                result, request_id = ask(client, task, max_steps)
+                result, request_id = ask(client=client, task=task, max_steps=max_steps)
                 answer = result["answer"]
                 caption = f"{result['steps']} model calls · request `{request_id}`"
             except httpx.HTTPError as e:

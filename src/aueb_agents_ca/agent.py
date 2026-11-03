@@ -29,7 +29,7 @@ Conversation = list[ChatCompletionMessageParam | ChatCompletionMessage]
 
 
 def run_agent(
-    task: str, llm: OpenAI, tools: ReviewTools, model: str, max_steps: int = 8
+    *, task: str, llm: OpenAI, tools: ReviewTools, model: str, max_steps: int = 8
 ) -> tuple[str, Conversation]:
     """Run the agent loop on one task. Returns the final answer and the full conversation."""
     messages: Conversation = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": task}]

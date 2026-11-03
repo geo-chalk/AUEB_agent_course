@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Runs once at startup: read the settings and create the clients that every request will share."""
     # read the settings
     app.state.settings = Settings.from_env()
-    configure_logging(app.state.settings.log_level, app.state.settings.log_dir)
+    configure_logging(level=app.state.settings.log_level, log_dir=app.state.settings.log_dir)
     logger.info("startup: model=%s base_url=%s", app.state.settings.model, app.state.settings.base_url)
 
     # define classes needed to run the Agent
@@ -96,12 +96,14 @@ def get_tools(request: Request) -> ReviewTools:
     return ReviewTools(llm=state.llm, settings=state.settings, http=state.http, search=state.search)
 
 
-def run_task(task: str, max_steps: int, request: Request, tools: ReviewTools) -> tuple[str, int]:
+def run_task(*, task: str, max_steps: int, request: Request, tools: ReviewTools) -> tuple[str, int]:
     """Run the agent on one task and return its answer and the number of model calls it made."""
     state = request.app.state
     logger.info("agent task=%r max_steps=%d", task, max_steps)
     t0 = time.perf_counter()
-    answer, conversation = run_agent(task, state.llm, tools, state.settings.model, max_steps)
+    answer, conversation = run_agent(
+        task=task, llm=state.llm, tools=tools, model=state.settings.model, max_steps=max_steps
+    )
     steps = sum(1 for m in conversation if not isinstance(m, dict))  # the model's messages = model calls
     logger.info("agent done in %.1fs, %d model calls", time.perf_counter() - t0, steps)
     return answer, steps
@@ -129,7 +131,12 @@ def summarise(
     body: SummariseRequest, request: Request, tools: Annotated[ReviewTools, Depends(get_tools)]
 ) -> SummariseResponse:
     """Summarise the reviews of one product. Costs about twenty model requests on the free tier."""
-    summary, steps = run_task(f"Summarise the reviews of the {body.product}.", body.max_steps, request, tools)
+    summary, steps = run_task(
+        task=f"Summarise the reviews of the {body.product}.",
+        max_steps=body.max_steps,
+        request=request,
+        tools=tools,
+    )
     return SummariseResponse(
         product=body.product, summary=summary, model=request.app.state.settings.model, steps=steps
     )
@@ -139,7 +146,7 @@ def summarise(
 def ask(body: AskRequest, request: Request, tools: Annotated[ReviewTools, Depends(get_tools)]) -> AskResponse:
     """Run the agent on a free-form task about a product's reviews (what the chat page sends).
     The system prompt makes the agent refuse tasks that are not about product reviews."""
-    answer, steps = run_task(body.task, body.max_steps, request, tools)
+    answer, steps = run_task(task=body.task, max_steps=body.max_steps, request=request, tools=tools)
     return AskResponse(task=body.task, answer=answer, model=request.app.state.settings.model, steps=steps)
 
 
@@ -151,7 +158,7 @@ def summarise_stream(
     they happen ({"log": ...}) and finally the result ({"result": ...}) or an error ({"error": ...}).
     A client can show what the agent is doing instead of a spinner for a minute."""
     rid = request_id.get()
-    capture = RequestLogQueue(rid)  # catches this request's log lines
+    capture = RequestLogQueue(rid=rid)  # catches this request's log lines
     logging.getLogger().addHandler(capture)
     outcome: Queue[dict] = Queue()
     task = f"Summarise the reviews of the {body.product}."
@@ -159,7 +166,7 @@ def summarise_stream(
 
     def work() -> None:  # the agent runs in its own thread so the response can stream meanwhile
         try:
-            summary, steps = run_task(task, body.max_steps, request, tools)
+            summary, steps = run_task(task=task, max_steps=body.max_steps, request=request, tools=tools)
             result = SummariseResponse(product=body.product, summary=summary, model=model, steps=steps)
             outcome.put({"result": result.model_dump()})
         except Exception as e:

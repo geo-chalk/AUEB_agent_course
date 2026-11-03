@@ -16,7 +16,7 @@ This page checks that the API behind both is reachable and shows what it is runn
 
 st.subheader("📊 API health")
 client = make_client()
-health, latency_ms = api_health(client)
+health, latency_ms = api_health(client=client)
 
 if health is None:
     st.error(

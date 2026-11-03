@@ -23,7 +23,7 @@ CHATTY_LIBRARIES = ("httpx", "httpx2", "httpcore", "httpcore2", "primp")
 # The log file rotates: when app.log reaches MAX_BYTES it becomes app.log.1 and a fresh app.log starts,
 # and the oldest of the BACKUP_COUNT rotated files is deleted. Five files of 5 MB at most on disk.
 LOG_FILE = "app.log"
-MAX_BYTES = 5 * 1024 * 1024
+MAX_BYTES = 0.5 * 1024 * 1024
 BACKUP_COUNT = 4
 
 
@@ -38,7 +38,7 @@ class RequestIdFilter(logging.Filter):
 _handlers: list[logging.Handler] = []  # the handlers this module installed, so it can replace them
 
 
-def configure_logging(level: str = "INFO", log_dir: str | Path | None = "logs") -> None:
+def configure_logging(*, level: str = "INFO", log_dir: str | Path | None = "logs") -> None:
     """Send our log lines to stdout and, unless log_dir is None, to a rotating file in log_dir, in one
     format. Safe to call more than once (notebook re-runs): it replaces only its own handlers and leaves
     any others (pytest's, for example) alone."""
@@ -72,7 +72,7 @@ class RequestLogQueue(logging.Handler):
     """Collects the INFO lines of one request into a queue, so they can be streamed to the client while the
     request is still running. Attach to the root logger for the duration of the request, then remove."""
 
-    def __init__(self, rid: str) -> None:
+    def __init__(self, *, rid: str) -> None:
         super().__init__(level=logging.INFO)
         self.rid = rid
         self.lines: Queue[str] = Queue()

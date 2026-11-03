@@ -167,6 +167,12 @@ test them with fakes, offline. Run the tests with:
 uv run pytest
 ```
 
+One convention holds everywhere in the package, the tests and the notebooks: every function of ours takes
+**keyword-only arguments**, the `*` at the start of its parameter list, so every call names what it
+passes (`run_agent(task=..., llm=..., tools=..., model=...)`). Calls stay readable when a function has
+several arguments of the same type, adding or reordering a parameter cannot silently change a call's
+meaning, and a tool's arguments match the names in its schema, which is how the model calls it anyway.
+
 The package version of the tools is the notebook version plus the hardening a real service needs:
 search failures returned as text, embedding requests batched and capped, empty pages skipped, logging
 instead of prints.

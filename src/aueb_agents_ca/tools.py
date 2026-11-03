@@ -56,7 +56,7 @@ EXTRACT_PROMPT = (
 class ReviewTools:
     """The functions the agent can call, bound to their dependencies."""
 
-    def __init__(self, llm: OpenAI, settings: Settings, http: httpx.Client, search: DDGS) -> None:
+    def __init__(self, *, llm: OpenAI, settings: Settings, http: httpx.Client, search: DDGS) -> None:
         self.llm = llm
         self.settings = settings
         self.http = http
@@ -65,10 +65,10 @@ class ReviewTools:
 
     # ----- the two tools the agent sees -----
 
-    def search_reviews(self, query: str, max_results: int = 10) -> list[dict] | str:
+    def search_reviews(self, *, query: str, max_results: int = 10) -> list[dict] | str:
         """Web search, exactly as queried. Returns title, url and snippet per result."""
         try:
-            results = self.search.text(query, max_results=max_results)
+            results = self.search.text(query=query, max_results=max_results)
         except DDGSException as e:
             # The search backend throttles now and then. Report it as text; the model can rephrase and retry.
             logger.warning("search %r failed: %s", query, e)
@@ -77,7 +77,7 @@ class ReviewTools:
         # Keep only what the agent needs; every field here ends up as tokens in the prompt.
         return [{"title": r["title"], "url": r["href"], "snippet": r["body"]} for r in results]
 
-    def fetch_page(self, url: str, max_chars: int = 20000) -> str:
+    def fetch_page(self, *, url: str, max_chars: int = 20000) -> str:
         """Download a web page and return its readable text, cut to max_chars.
 
         Not exposed to the model: given the choice, a small model sometimes reads pages instead of
@@ -95,11 +95,11 @@ class ReviewTools:
         logger.info("fetched %s: %d characters of readable text", url, len(text))
         return text
 
-    def analyze_pages(self, urls: list[str]) -> dict:
+    def analyze_pages(self, *, urls: list[str]) -> dict:
         """Fetch review pages (or reuse already fetched ones) and return the aspect table."""
         texts, used, failed = [], [], []
         for url in urls:
-            text = self.pages.get(url) or self.fetch_page(url)
+            text = self.pages.get(url) or self.fetch_page(url=url)
             if not text or text.startswith("ERROR"):  # blocked, or nothing readable on the page
                 failed.append(url)
             else:
@@ -109,7 +109,7 @@ class ReviewTools:
             logger.warning("analyze_pages: none of the %d pages could be fetched", len(urls))
             return {"error": "none of the pages could be fetched", "failed": failed}
         logger.info("analyze_pages: %d pages to analyse, %d failed", len(used), len(failed))
-        return {"pages_analyzed": used, "pages_failed": failed, "aspects": self.analyze_reviews(texts)}
+        return {"pages_analyzed": used, "pages_failed": failed, "aspects": self.analyze_reviews(texts=texts)}
 
     @property
     def registry(self) -> dict[str, Callable]:
@@ -118,7 +118,7 @@ class ReviewTools:
 
     # ----- building blocks of the analysis -----
 
-    def extract_opinions(self, text: str) -> list[dict]:
+    def extract_opinions(self, *, text: str) -> list[dict]:
         """Ask the model to list every opinion in a review as (aspect, sentiment, quote)."""
         t0 = time.perf_counter()
         response = self.llm.chat.completions.create(
@@ -139,7 +139,7 @@ class ReviewTools:
         logger.debug("opinions: %s", opinions)
         return opinions
 
-    def embed(self, texts: list[str], batch_size: int = 100) -> np.ndarray:
+    def embed(self, *, texts: list[str], batch_size: int = 100) -> np.ndarray:
         """One unit-length vector per text, as rows of a matrix. Sent in batches: providers cap the batch size."""
         vectors = []
         for start in range(0, len(texts), batch_size):
@@ -150,7 +150,9 @@ class ReviewTools:
         matrix = np.array(vectors)
         return matrix / np.linalg.norm(matrix, axis=1, keepdims=True)
 
-    def merge_aspects(self, names: list[str], threshold: float = 0.8, max_names: int = 40) -> dict[str, str]:
+    def merge_aspects(
+        self, *, names: list[str], threshold: float = 0.8, max_names: int = 40
+    ) -> dict[str, str]:
         """Map each aspect name to a canonical one; near-duplicates share the most frequent spelling.
 
         Only the `max_names` most frequent names are embedded and merged: the long tail of one-off names
@@ -162,7 +164,7 @@ class ReviewTools:
         if self.settings.embedding_model is None or not head:
             return mapping
         try:
-            vectors = self.embed(head)
+            vectors = self.embed(texts=head)
         except Exception as e:  # embedding endpoint unavailable? merge nothing, but do not crash
             logger.warning("embedding failed, skipping merge: %s", e)
             return mapping
@@ -185,17 +187,17 @@ class ReviewTools:
         )
         return mapping
 
-    def analyze_reviews(self, texts: list[str], max_quotes: int = 2) -> list[dict]:
+    def analyze_reviews(self, *, texts: list[str], max_quotes: int = 2) -> list[dict]:
         """Per aspect: how many positive/negative/mixed opinions and a few quotes. Most discussed first."""
         opinions = []
         for text in texts:
             try:
-                opinions += self.extract_opinions(text)
+                opinions += self.extract_opinions(text=text)
             except Exception as e:  # one bad page must not sink the whole analysis
                 logger.warning("extraction failed for one text: %s", e)
 
         names = [o["aspect"].lower().strip() for o in opinions]
-        canonical = self.merge_aspects(names)
+        canonical = self.merge_aspects(names=names)
 
         table: dict[str, dict] = {}
         for opinion, name in zip(opinions, names):
@@ -262,7 +264,7 @@ TOOL_SCHEMAS = [
 ]
 
 
-def build_tools(settings: Settings | None = None) -> ReviewTools:
+def build_tools(*, settings: Settings | None = None) -> ReviewTools:
     """Wire the real dependencies together. Notebooks and services call this; tests build ReviewTools by hand."""
     settings = settings or Settings.from_env()
     llm = OpenAI(base_url=settings.base_url, api_key=settings.api_key, timeout=60, max_retries=3)
