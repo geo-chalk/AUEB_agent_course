@@ -22,6 +22,7 @@ Plan: run search_reviews two or three times with different wording (for example 
 analyze_pages once with every review page found, skipping shops, adverts and duplicates; then write the
 summary from the returned table. Never invent reviews or quotes.
 If the task is not about summarising the reviews of a product, reply that it is not supported and stop."""
+# Exercise 5.3: add one sentence to the plan above asking the model to call find_product_image once.
 
 # The conversation mixes two kinds of entries: the dicts we write (system, user, tool messages) and the
 # message objects the model returns, which we append as they are.

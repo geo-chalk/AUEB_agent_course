@@ -62,6 +62,7 @@ class ReviewTools:
         self.http = http
         self.search = search
         self.pages: dict[str, str] = {}  # url -> text, so the model can refer to a page by its URL
+        self.image: dict | None = None  # Exercise 5.1: filled by find_product_image, read by the API
 
     # ----- the two tools the agent sees -----
 
@@ -111,10 +112,23 @@ class ReviewTools:
         logger.info("analyze_pages: %d pages to analyse, %d failed", len(used), len(failed))
         return {"pages_analyzed": used, "pages_failed": failed, "aspects": self.analyze_reviews(texts=texts)}
 
+    def find_product_image(self, *, product: str) -> dict | str:
+        """Exercise 5.1: find a picture of the product.
+
+        Use self.search.images(query=..., max_results=...): each result has "image", "thumbnail", "url"
+        and "title". Keep the full result on self.image for the API (the model has no use for URLs) and
+        return only the title and the source page. Never raise: return "ERROR: ..." when nothing is found.
+        """
+        raise NotImplementedError("Exercise 5.1: implement find_product_image")
+
     @property
     def registry(self) -> dict[str, Callable]:
         """Tool name -> function, so the agent loop can run what the model asks for."""
-        return {"search_reviews": self.search_reviews, "analyze_pages": self.analyze_pages}
+        return {
+            "search_reviews": self.search_reviews,
+            "analyze_pages": self.analyze_pages,
+            # Exercise 5.2: register find_product_image here
+        }
 
     # ----- building blocks of the analysis -----
 
@@ -261,6 +275,9 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    # Exercise 5.2: describe find_product_image to the model, in the same shape as the two above:
+    # a name, a one-sentence description (all the model has to decide when to call it), and one
+    # required "product" parameter.
 ]
 
 

@@ -65,6 +65,8 @@ if st.button("Summarise", type="primary", disabled=not product):
     if error or result is None:
         st.error(error or "The API closed the stream without a result.")
         st.stop()
+    # Exercise 5.6: when result["image"] is present, show it above the summary with st.image, with the
+    # title and the source page as the caption. Which of "thumbnail" and "url" should you display?
     st.markdown(result["summary"])
     st.caption(f"{result['steps']} model calls · {result['model']} · request `{request_id}`")
     with st.expander("The raw API response"):
