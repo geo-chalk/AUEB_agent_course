@@ -516,7 +516,7 @@ Everything you need to change is marked `Exercise 5.x` in the code. Work in this
 | 5.3 | `src/aueb_agents_ca/agent.py`, `SYSTEM_PROMPT` | one sentence asking the model to call the tool once. Try without it first and see how often the model calls the tool on its own |
 | 5.4 | `src/aueb_agents_ca/api.py`, `product_image` | return what the agent found, `tools.image`, as a `ProductImage`; both `/summarise` and `/summarise/stream` already call this function |
 | 5.5 | `api.py`, same function | the model sometimes skips the tool. If `tools.image` is empty, call the tool yourself before answering: what the service can guarantee should not be left to the model |
-| 5.6 | `src/aueb_agents_ca/ui/pages/1_📝_Summarise.py` | show the image above the summary with `st.image`, with the title and the source page as the caption. Which URL to show, `thumbnail` or `url`? Try both |
+| 5.6 | `src/aueb_agents_ca/ui/pages/1_📝_Summarise.py` | show a *small* picture beside the product name (`st.columns`, `st.image` with a width of about 110 px), the title linking to the source page. A full-width image looks bad with many results. Which URL to show, `thumbnail` or `url`? Try both. And strip any image the model pasted into the summary before rendering it: the page shows the picture, not the model |
 
 Check your tool on its own, for free, before touching the rest:
 

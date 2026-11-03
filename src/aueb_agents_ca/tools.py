@@ -116,8 +116,9 @@ class ReviewTools:
         """Exercise 5.1: find a picture of the product.
 
         Use self.search.images(query=..., max_results=...): each result has "image", "thumbnail", "url"
-        and "title". Keep the full result on self.image for the API (the model has no use for URLs) and
-        return only the title and the source page. Never raise: return "ERROR: ..." when nothing is found.
+        and "title". Keep the full result on self.image for the API and return only the title and the
+        source page: give the model no URL, or it pastes it into the summary as a broken image. Tell it
+        in the result that the page shows the picture. Never raise: return "ERROR: ..." when nothing is found.
         """
         raise NotImplementedError("Exercise 5.1: implement find_product_image")
 
