@@ -6,7 +6,7 @@ import httpx
 from streamlit.testing.v1 import AppTest
 
 import aueb_agents_ca.ui as ui_package
-from aueb_agents_ca.ui.api_client import api_health, ask, summarise
+from aueb_agents_ca.ui.client import api_health, ask, summarise
 
 UI_DIR = Path(ui_package.__file__).parent
 

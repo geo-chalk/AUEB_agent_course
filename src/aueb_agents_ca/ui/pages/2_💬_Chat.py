@@ -3,7 +3,7 @@
 import httpx
 import streamlit as st
 
-from aueb_agents_ca.ui.api_client import api_health, api_url, ask, make_client
+from aueb_agents_ca.ui.client import api_health, api_url, ask, make_client
 
 st.set_page_config(page_title="Chat", page_icon="💬", layout="centered")
 st.title("💬 Ask about a product's reviews")

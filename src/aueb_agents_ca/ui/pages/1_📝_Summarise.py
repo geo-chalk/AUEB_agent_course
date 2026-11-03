@@ -3,7 +3,7 @@
 import httpx
 import streamlit as st
 
-from aueb_agents_ca.ui.api_client import api_health, api_url, make_client, summarise
+from aueb_agents_ca.ui.client import api_health, api_url, make_client, summarise
 
 st.set_page_config(page_title="Summarise", page_icon="📝", layout="centered")
 st.title("📝 Summarise the reviews of a product")

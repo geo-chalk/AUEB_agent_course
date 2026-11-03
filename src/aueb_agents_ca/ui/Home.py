@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from aueb_agents_ca.ui.api_client import api_health, api_url, make_client
+from aueb_agents_ca.ui.client import api_health, api_url, make_client
 
 st.set_page_config(page_title="Review summariser", page_icon="📝", layout="centered")
 st.title("📝 Review summariser")

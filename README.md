@@ -415,7 +415,7 @@ number in their file name.
 
 | File | What it does |
 |---|---|
-| `api_client.py` | the only place the UI talks to the API: `api_health`, `summarise`, `ask`. Each returns the body and the `X-Request-ID` header. `API_URL` is the one setting: `http://localhost:8000` on a laptop, `http://api:8000` inside compose |
+| `client.py` | the only place the UI talks to the API: `api_health`, `summarise`, `ask`. Each returns the body and the `X-Request-ID` header. `API_URL` is the one setting: `http://localhost:8000` on a laptop, `http://api:8000` inside compose |
 | `Home.py` | the health dashboard: status, model and latency as metrics, then the embedding model, the tools the agent can call and a link to `/docs`. If the API is down it says so and how to start it. Costs no model call |
 | `pages/1_📝_Summarise.py` | a list of example products to pick from, the product box, and the equivalent `curl` command to copy. The button posts to `/summarise`, renders the summary, and shows the model calls and the request id; the raw JSON sits in an expander |
 | `pages/2_💬_Chat.py` | a chat box that posts each message to `/ask`. The history lives in `st.session_state`; suggested questions sit in the sidebar |
