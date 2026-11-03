@@ -12,6 +12,10 @@ request_id: ContextVar[str] = ContextVar("request_id", default="-")
 
 FORMAT = "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"
 
+# Libraries that log every HTTP request at INFO: httpx (our page fetches) and httpx2 (the copy inside the
+# openai SDK). Useful when debugging, noise otherwise, so they are shown only at DEBUG.
+CHATTY_LIBRARIES = ("httpx", "httpx2", "httpcore", "httpcore2")
+
 
 class RequestIdFilter(logging.Filter):
     """Copies the current request id onto every record, so the format string can print it."""
@@ -36,3 +40,5 @@ def configure_logging(level: str = "INFO") -> None:
     _handler.addFilter(RequestIdFilter())
     root.addHandler(_handler)
     root.setLevel(level.upper())
+    for name in CHATTY_LIBRARIES:
+        logging.getLogger(name).setLevel(logging.DEBUG if level.upper() == "DEBUG" else logging.WARNING)
