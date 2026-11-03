@@ -27,8 +27,9 @@ aueb_agents_CA/
 ├── .python-version         # Python version uv will use (3.13)
 ├── .env.example            # template for your secrets; copy to .env
 ├── notebooks/              # Step 1 lessons live here (img/ holds their figures)
-├── src/aueb_agents_ca/     # the package: settings.py (config), tools.py (tools), agent.py (the loop), api.py (FastAPI)
+├── src/aueb_agents_ca/     # the package: settings, log, tools, agent, api (read __init__.py for the map)
 ├── tests/                  # pytest tests that run without internet or API keys
+├── logs/                   # the rotating log file lands here (ignored by git)
 ├── setup/Dockerfile_dev    # Step 2: the development image (notebooks)
 ├── setup/Dockerfile        # Step 3: the production image (the API)
 ├── docker-compose.yml      # how to run the images locally (ports, .env, mounted folders, reload)
@@ -39,8 +40,9 @@ aueb_agents_CA/
 
 ```bash
 git clone <this repo> && cd aueb_agents_CA
-uv sync                      # creates .venv and installs everything from uv.lock
+uv sync --extra api          # creates .venv and installs everything from uv.lock, including the API's packages
 cp .env.example .env         # then put your Gemini key in .env
+uv run pytest                # 19 tests, no internet or key needed: the setup works
 uv run jupyter lab           # open notebooks/
 ```
 
@@ -49,7 +51,8 @@ uv run jupyter lab           # open notebooks/
 Or, with Docker installed, skip uv entirely:
 
 ```bash
-docker compose up --build        # then open http://localhost:8989
+cp .env.example .env             # compose reads .env, so it must exist; put your Gemini key in it
+docker compose up --build        # notebooks at http://localhost:8989, API at http://localhost:8000/docs
 ```
 
 ## Choosing an LLM provider
@@ -237,7 +240,7 @@ and a `ui` service to this same file.
 ### 2.4 Run and verify
 
 ```bash
-docker compose up --build
+docker compose up --build notebook
 ```
 
 Open http://localhost:8989 and run notebook 01's first cell: if it prints the model name, the key made it
@@ -253,8 +256,17 @@ Using Ollama? Inside a container, `localhost` is the container itself. Point `.e
 
 ## Step 3: FastAPI, and Docker for production
 
-The agent becomes a web service: anything that can send an HTTP request (a UI, a script, a colleague's
-program) can ask for a summary without knowing how the agent works.
+So far the agent runs in a notebook, on the laptop of the person who wrote it. Here is the situation that
+makes that insufficient. The marketing team wants review summaries for the 200 products in next week's
+campaign, refreshed every Monday; the e-commerce team wants the "what customers say" box on each product
+page to come from the same analysis; and a data scientist in another team wants to compare products across
+categories. None of them should need to open a notebook, install Python, hold the LLM key or know what
+an aspect table is. They need a *service*: a URL that takes a product name and returns a summary, with
+one place where the key lives, the model is chosen, the quotas are managed and the logs are kept.
+
+That is what an API is. The agent becomes a web service: anything that can send an HTTP request (a UI,
+a scheduled job, a colleague's program) can ask for a summary without knowing how the agent works, and
+the Step 4 UI is just the first such client.
 
 ### 3.1 The loop moves into the package
 
@@ -271,7 +283,8 @@ uv add --optional api fastapi "uvicorn[standard]"
 
 FastAPI and uvicorn go into an *optional* group called `api`, listed under `[project.optional-dependencies]`
 in `pyproject.toml`: the notebook image does not need a web server, and the API image does not need
-Jupyter. `uv sync --extra api` installs the group locally.
+Jupyter. A plain `uv sync` leaves extras out, which is why the quick start says `uv sync --extra api`;
+without it, `tests/test_api.py` and `uvicorn` cannot import FastAPI.
 
 ### 3.3 The service: `src/aueb_agents_ca/api.py`
 
@@ -352,7 +365,10 @@ aspect merge. `LOG_LEVEL=DEBUG` in `.env` adds the full tool results and extract
 docker compose logs -f api
 ```
 
-The same lines also go to a file, `logs/app.log`, mounted from the container so it lands in the repo.
+`LOG_LEVEL` and `LOG_DIR` are two more lines in `.env.example`, read by `settings.py` like the others.
+
+The same lines also go to a file, `logs/app.log`, mounted from the container so it lands in the repo
+(`./logs:/app/logs` in both compose services; `logs/*` is git-ignored and `logs/` is in `.dockerignore`).
 The file *rotates*: at 5 MB it becomes `app.log.1` and a fresh `app.log` starts, and the oldest of the
 five files is deleted, so the folder can never fill a disk. `LOG_DIR` in `.env` moves it; empty means
 stdout only. In a real deployment you would usually keep only stdout and let the platform collect it,
