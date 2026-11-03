@@ -26,11 +26,13 @@ if health is None:
 
 example = st.selectbox("Try one of these", EXAMPLES)
 product = st.text_input("Product", value=example)
+# The loop's safety net: the agent usually finishes in 3 or 4 model calls; fewer steps cut a run short.
+max_steps = st.slider("Max model calls (max_steps)", min_value=1, max_value=20, value=8)
 
 # # What the page is about to do, as the equivalent terminal command: copy it to call the API yourself.
 # st.code(
 #     f"""curl -s -X POST {api_url()}/summarise -H 'Content-Type: application/json' \\
-#   -d '{{"product": "{product}"}}' | jq -r .summary""",
+#   -d '{{"product": "{product}", "max_steps": {max_steps}}}' | jq -r .summary""",
 #     language="bash",
 # )
 
@@ -41,7 +43,7 @@ if st.button("Summarise", type="primary", disabled=not product):
     with st.status("Running the agent: searching, reading and analysing reviews...", expanded=True) as status:
         log_box = st.empty()
         try:
-            for event in stream_summarise(client, product):
+            for event in stream_summarise(client, product, max_steps):
                 request_id = event["request_id"]
                 if "log" in event:
                     lines.append(event["log"])

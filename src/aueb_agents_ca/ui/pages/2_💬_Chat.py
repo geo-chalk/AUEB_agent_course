@@ -23,6 +23,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 with st.sidebar:
+    max_steps = st.slider("Max model calls per message (max_steps)", min_value=1, max_value=20, value=8)
     st.markdown("**Try asking**")
     for suggestion in (
         "What do reviewers dislike about the Sony WH-1000XM5?",
@@ -47,7 +48,7 @@ if task := st.chat_input("Ask about the reviews of a product"):
     with st.chat_message("assistant"):
         with st.spinner("Running the agent (about a minute)..."):
             try:
-                result, request_id = ask(client, task)
+                result, request_id = ask(client, task, max_steps)
                 answer = result["answer"]
                 caption = f"{result['steps']} model calls · request `{request_id}`"
             except httpx.HTTPError as e:
