@@ -28,7 +28,13 @@ def test_health_and_summarise_with_fake_dependencies(monkeypatch):
 
     app.dependency_overrides.clear()
     assert response.status_code == 200, response.text
-    assert response.json() == {"product": "XM5", "summary": "a summary", "model": "fake-model", "steps": 2}
+    assert response.json() == {
+        "product": "XM5",
+        "summary": "a summary",
+        "model": "fake-model",
+        "steps": 2,
+        "image": None,
+    }
     assert len(response.headers["X-Request-ID"]) == 8  # the id that tags this request's log lines
 
 
