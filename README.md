@@ -364,10 +364,11 @@ Then, in cost order:
 2. One real request, about twenty model calls on the free tier, so run it once:
 
 ```bash
-curl -X POST localhost:8000/summarise -H 'Content-Type: application/json' -d '{"product": "Sony WH-1000XM5"}'
+curl -s -X POST localhost:8000/summarise -H 'Content-Type: application/json' -d '{"product": "Sony WH-1000XM5"}' | jq -r .summary
 ```
 
-The `/docs` page can send the same request from a form.
+The response is JSON and `summary` is Markdown; `jq -r` unescapes it so it reads as written. Rendering it is
+the job of a client, which is what Step 4 builds. The `/docs` page can send the same request from a form.
 
 ## Step 4: UI
 
