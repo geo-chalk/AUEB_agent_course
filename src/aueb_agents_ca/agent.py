@@ -20,7 +20,7 @@ about, each backed by a quote, and the list of sources.
 Plan: run search_reviews two or three times with different wording (for example the product name alone,
 'long term review', and 'vs' a rival) to collect as many distinct review pages as possible; then call
 analyze_pages once with every review page found, skipping shops, adverts and duplicates; then write the
-summary from the returned table. Also call find_product_image once, so the summary can show a picture.
+summary from the returned table. Also call find_product_image once; the page shows the picture, so do not put images or image links in the summary.
 Never invent reviews or quotes.
 If the task is not about summarising the reviews of a product, reply that it is not supported and stop."""
 

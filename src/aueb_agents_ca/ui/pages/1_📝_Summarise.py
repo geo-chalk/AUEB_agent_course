@@ -1,5 +1,7 @@
 """Summarise: one product in, one summary out. The page is a client of POST /summarise."""
 
+import re
+
 import httpx
 import streamlit as st
 
@@ -67,10 +69,14 @@ if st.button("Summarise", type="primary", disabled=not product):
         st.stop()
     if result.get("image"):
         image = result["image"]
-        # The thumbnail is served by the search engine and always loads; the original often refuses
-        # to be shown inside another site. Try swapping "thumbnail" for "url" and see.
-        st.image(image["thumbnail"], caption=f"{image['title']} (source: {image['source']})")
-    st.markdown(result["summary"])
+        # A small picture beside the product name. The thumbnail is served by the search engine and
+        # always loads; the original ("url") often refuses to be shown inside another site.
+        picture, heading = st.columns([1, 5])
+        picture.image(image["thumbnail"], width=110)
+        heading.subheader(result["product"])
+        heading.caption(f"[{image['title']}]({image['source']})")
+    # Safety net: a model sometimes pastes an image into its Markdown; the page shows the picture itself.
+    st.markdown(re.sub(r"!\[[^\]]*\]\([^)]*\)", "", result["summary"]))
     st.caption(f"{result['steps']} model calls · {result['model']} · request `{request_id}`")
     with st.expander("The raw API response"):
         st.json(result)

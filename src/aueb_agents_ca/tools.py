@@ -131,7 +131,13 @@ class ReviewTools:
             "title": first["title"],
         }
         logger.info("image for %r: %s (from %s)", product, first["image"], first["url"])
-        return {"title": first["title"], "source": first["url"]}
+        # No URL for the model: the page shows the picture itself, and a model given a URL tends to paste
+        # it into the summary as a broken image.
+        return {
+            "title": first["title"],
+            "source": first["url"],
+            "note": "The page will display this picture; do not include images or image links in your answer.",
+        }
 
     @property
     def registry(self) -> dict[str, Callable]:
