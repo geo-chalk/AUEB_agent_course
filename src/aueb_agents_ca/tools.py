@@ -62,8 +62,9 @@ class ReviewTools:
         self.http = http
         self.search = search
         self.pages: dict[str, str] = {}  # url -> text, so the model can refer to a page by its URL
+        self.image: dict | None = None  # the product image found by find_product_image, read by the API
 
-    # ----- the two tools the agent sees -----
+    # ----- the three tools the agent sees -----
 
     def search_reviews(self, *, query: str, max_results: int = 10) -> list[dict] | str:
         """Web search, exactly as queried. Returns title, url and snippet per result."""
@@ -111,10 +112,35 @@ class ReviewTools:
         logger.info("analyze_pages: %d pages to analyse, %d failed", len(used), len(failed))
         return {"pages_analyzed": used, "pages_failed": failed, "aspects": self.analyze_reviews(texts=texts)}
 
+    def find_product_image(self, *, product: str) -> dict | str:
+        """Find a picture of the product. Keeps the full result on self.image for the API; the model only
+        gets the title and the page it came from, since it has no use for the URLs themselves."""
+        try:
+            results = self.search.images(query=f"{product} product photo", max_results=5)
+        except DDGSException as e:
+            logger.warning("image search for %r failed: %s", product, e)
+            return f"ERROR: image search failed for {product!r}: {e}"
+        if not results:
+            logger.warning("image search for %r: no results", product)
+            return f"ERROR: no image found for {product!r}"
+        first = results[0]
+        self.image = {
+            "url": first["image"],  # the original file; sites often refuse to serve it inside another page
+            "thumbnail": first["thumbnail"],  # hosted by the search engine: always loads
+            "source": first["url"],
+            "title": first["title"],
+        }
+        logger.info("image for %r: %s (from %s)", product, first["image"], first["url"])
+        return {"title": first["title"], "source": first["url"]}
+
     @property
     def registry(self) -> dict[str, Callable]:
         """Tool name -> function, so the agent loop can run what the model asks for."""
-        return {"search_reviews": self.search_reviews, "analyze_pages": self.analyze_pages}
+        return {
+            "search_reviews": self.search_reviews,
+            "analyze_pages": self.analyze_pages,
+            "find_product_image": self.find_product_image,
+        }
 
     # ----- building blocks of the analysis -----
 
@@ -258,6 +284,18 @@ TOOL_SCHEMAS = [
                     }
                 },
                 "required": ["urls"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_product_image",
+            "description": "Find a picture of the product, so the summary can show one. Call it once.",
+            "parameters": {
+                "type": "object",
+                "properties": {"product": {"type": "string", "description": "The product name"}},
+                "required": ["product"],
             },
         },
     },

@@ -65,6 +65,11 @@ if st.button("Summarise", type="primary", disabled=not product):
     if error or result is None:
         st.error(error or "The API closed the stream without a result.")
         st.stop()
+    if result.get("image"):
+        image = result["image"]
+        # The thumbnail is served by the search engine and always loads; the original often refuses
+        # to be shown inside another site. Try swapping "thumbnail" for "url" and see.
+        st.image(image["thumbnail"], caption=f"{image['title']} (source: {image['source']})")
     st.markdown(result["summary"])
     st.caption(f"{result['steps']} model calls · {result['model']} · request `{request_id}`")
     with st.expander("The raw API response"):

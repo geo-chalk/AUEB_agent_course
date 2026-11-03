@@ -28,7 +28,13 @@ def test_health_and_summarise_with_fake_dependencies(monkeypatch):
 
     app.dependency_overrides.clear()
     assert response.status_code == 200, response.text
-    assert response.json() == {"product": "XM5", "summary": "a summary", "model": "fake-model", "steps": 2}
+    assert response.json() == {
+        "product": "XM5",
+        "summary": "a summary",
+        "model": "fake-model",
+        "steps": 2,
+        "image": None,
+    }
     assert len(response.headers["X-Request-ID"]) == 8  # the id that tags this request's log lines
 
 
@@ -65,7 +71,7 @@ def test_ask_runs_the_agent_on_a_free_form_task(monkeypatch):
 
     assert response.status_code == 200, response.text
     assert response.json()["answer"] == "Reviewers dislike the price." and response.json()["steps"] == 1
-    assert health["tools"] == ["search_reviews", "analyze_pages"]
+    assert health["tools"] == ["search_reviews", "analyze_pages", "find_product_image"]
 
 
 def test_summarise_stream_sends_log_lines_then_the_result(monkeypatch):

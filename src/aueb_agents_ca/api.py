@@ -58,11 +58,19 @@ class SummariseRequest(BaseModel):
     max_steps: int = Field(default=8, ge=1, le=20)
 
 
+class ProductImage(BaseModel):
+    url: str
+    thumbnail: str
+    source: str
+    title: str
+
+
 class SummariseResponse(BaseModel):
     product: str
     summary: str
     model: str
     steps: int  # how many model calls the loop made
+    image: ProductImage | None = None  # found by the agent's find_product_image tool, or by the fallback
 
 
 class AskRequest(BaseModel):
@@ -94,6 +102,14 @@ def get_tools(request: Request) -> ReviewTools:
     """A fresh ReviewTools per request (its page cache belongs to one run), built from the shared clients."""
     state = request.app.state
     return ReviewTools(llm=state.llm, settings=state.settings, http=state.http, search=state.search)
+
+
+def product_image(*, tools: ReviewTools, product: str) -> ProductImage | None:
+    """The image the agent found during its run. If the model skipped the tool, call it ourselves: what the
+    service can guarantee should not be left to the model."""
+    if tools.image is None:
+        tools.find_product_image(product=product)
+    return ProductImage(**tools.image) if tools.image else None
 
 
 def run_task(*, task: str, max_steps: int, request: Request, tools: ReviewTools) -> tuple[str, int]:
@@ -138,7 +154,11 @@ def summarise(
         tools=tools,
     )
     return SummariseResponse(
-        product=body.product, summary=summary, model=request.app.state.settings.model, steps=steps
+        product=body.product,
+        summary=summary,
+        model=request.app.state.settings.model,
+        steps=steps,
+        image=product_image(tools=tools, product=body.product),
     )
 
 
@@ -167,7 +187,13 @@ def summarise_stream(
     def work() -> None:  # the agent runs in its own thread so the response can stream meanwhile
         try:
             summary, steps = run_task(task=task, max_steps=body.max_steps, request=request, tools=tools)
-            result = SummariseResponse(product=body.product, summary=summary, model=model, steps=steps)
+            result = SummariseResponse(
+                product=body.product,
+                summary=summary,
+                model=model,
+                steps=steps,
+                image=product_image(tools=tools, product=body.product),
+            )
             outcome.put({"result": result.model_dump()})
         except Exception as e:
             logger.exception("agent failed")

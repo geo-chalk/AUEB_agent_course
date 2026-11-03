@@ -32,5 +32,7 @@ class ScriptedLLM:
 
 # A tools object with just what the loop needs: a registry of callables.
 FAKE_TOOLS = SimpleNamespace(
-    registry={"search_reviews": lambda query, max_results=10: [{"title": "t", "url": "u", "snippet": "s"}]}
+    registry={"search_reviews": lambda query, max_results=10: [{"title": "t", "url": "u", "snippet": "s"}]},
+    image=None,
+    find_product_image=lambda product: None,
 )
