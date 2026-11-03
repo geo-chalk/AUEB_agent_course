@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
+from collections.abc import Iterator
 
 import httpx
 
@@ -44,3 +46,16 @@ def ask(client: httpx.Client, task: str, max_steps: int = 8) -> tuple[dict, str]
     response = client.post("/ask", json={"task": task, "max_steps": max_steps}, timeout=AGENT_TIMEOUT)
     response.raise_for_status()
     return response.json(), response.headers.get("X-Request-ID", "-")
+
+
+def stream_summarise(client: httpx.Client, product: str, max_steps: int = 8) -> Iterator[dict]:
+    """POST /summarise/stream and yield each line as it arrives: {"log": ...} while the agent runs, then
+    {"result": ...} or {"error": ...}. Every event also carries the request id."""
+    with client.stream(
+        "POST", "/summarise/stream", json={"product": product, "max_steps": max_steps}, timeout=AGENT_TIMEOUT
+    ) as response:
+        response.raise_for_status()
+        rid = response.headers.get("X-Request-ID", "-")
+        for line in response.iter_lines():
+            if line:
+                yield {**json.loads(line), "request_id": rid}

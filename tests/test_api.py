@@ -1,5 +1,7 @@
 """The API end to end through FastAPI's test client, with the model and the tools replaced by fakes."""
 
+import json
+
 from fakes import FAKE_TOOLS, ScriptedLLM, message, tool_call
 from fastapi.testclient import TestClient
 
@@ -61,3 +63,23 @@ def test_ask_runs_the_agent_on_a_free_form_task(monkeypatch):
     assert response.status_code == 200, response.text
     assert response.json()["answer"] == "Reviewers dislike the price." and response.json()["steps"] == 1
     assert health["tools"] == ["search_reviews", "analyze_pages"]
+
+
+def test_summarise_stream_sends_log_lines_then_the_result(monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "http://fake")
+    monkeypatch.setenv("LLM_API_KEY", "fake")
+    monkeypatch.setenv("LLM_MODEL", "fake-model")
+    app.dependency_overrides[get_tools] = lambda: FAKE_TOOLS
+    with TestClient(app) as client:
+        client.app.state.llm = ScriptedLLM(
+            [message(tool_calls=[tool_call("search_reviews", query="x")]), message(content="a summary")]
+        )
+        with client.stream("POST", "/summarise/stream", json={"product": "XM5"}) as response:
+            assert response.headers["content-type"].startswith("application/x-ndjson")
+            events = [json.loads(line) for line in response.iter_lines() if line]
+    app.dependency_overrides.clear()
+
+    logs = [e["log"] for e in events if "log" in e]
+    assert "agent task='Summarise the reviews of the XM5.'" in logs[0]
+    assert any("model asks for search_reviews" in line for line in logs)
+    assert events[-1]["result"]["summary"] == "a summary" and events[-1]["result"]["steps"] == 2

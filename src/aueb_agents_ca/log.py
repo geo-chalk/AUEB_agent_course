@@ -9,6 +9,7 @@ import sys
 from contextvars import ContextVar
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from queue import Queue
 
 # Set by the API for the duration of a request; "-" outside a request (notebooks, scripts, tests).
 request_id: ContextVar[str] = ContextVar("request_id", default="-")
@@ -65,3 +66,20 @@ def configure_logging(level: str = "INFO", log_dir: str | Path | None = "logs") 
     # we want to silence libraries that generate a log of logs, or turn them to debug
     for name in CHATTY_LIBRARIES:
         logging.getLogger(name).setLevel(logging.DEBUG if level.upper() == "DEBUG" else logging.WARNING)
+
+
+class RequestLogQueue(logging.Handler):
+    """Collects the INFO lines of one request into a queue, so they can be streamed to the client while the
+    request is still running. Attach to the root logger for the duration of the request, then remove."""
+
+    def __init__(self, rid: str) -> None:
+        super().__init__(level=logging.INFO)
+        self.rid = rid
+        self.lines: Queue[str] = Queue()
+        self.setFormatter(logging.Formatter("%(asctime)s %(name)s: %(message)s", datefmt="%H:%M:%S"))
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return request_id.get() == self.rid  # only this request's lines, even with other requests running
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.lines.put(self.format(record))

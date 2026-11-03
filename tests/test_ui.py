@@ -6,7 +6,7 @@ import httpx
 from streamlit.testing.v1 import AppTest
 
 import aueb_agents_ca.ui as ui_package
-from aueb_agents_ca.ui.client import api_health, ask, summarise
+from aueb_agents_ca.ui.client import api_health, ask, stream_summarise, summarise
 
 UI_DIR = Path(ui_package.__file__).parent
 
@@ -39,3 +39,14 @@ def test_every_page_tells_the_user_when_the_api_is_down(monkeypatch):
     for page in (UI_DIR / "Home.py", *sorted((UI_DIR / "pages").glob("*.py"))):
         app = AppTest.from_file(str(page)).run()
         assert "not reachable" in app.error[0].value, page.name
+
+
+def test_stream_summarise_yields_log_lines_then_the_result():
+    def handler(request):
+        assert request.url.path == "/summarise/stream"
+        body = b'{"log": "10:00:00 agent start"}\n{"log": "10:00:01 step 0"}\n{"result": {"summary": "# ok", "steps": 2, "model": "m"}}\n'
+        return httpx.Response(200, content=body, headers={"X-Request-ID": "abc12345"})
+
+    events = list(stream_summarise(fake_api(handler), "XM5"))
+    assert [e.get("log") for e in events[:2]] == ["10:00:00 agent start", "10:00:01 step 0"]
+    assert events[-1]["result"]["summary"] == "# ok" and events[-1]["request_id"] == "abc12345"

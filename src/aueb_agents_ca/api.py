@@ -2,22 +2,27 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
+from contextvars import copy_context
+from queue import Empty, Queue
+from threading import Thread
 from typing import Annotated
 
 import httpx
 from ddgs import DDGS
 from fastapi import Depends, FastAPI, Request, Response
+from fastapi.responses import StreamingResponse
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from starlette.responses import RedirectResponse
 
 from aueb_agents_ca.agent import run_agent
-from aueb_agents_ca.log import configure_logging, request_id
+from aueb_agents_ca.log import RequestLogQueue, configure_logging, request_id
 from aueb_agents_ca.settings import Settings
 from aueb_agents_ca.tools import TOOL_SCHEMAS, ReviewTools
 
@@ -136,3 +141,47 @@ def ask(body: AskRequest, request: Request, tools: Annotated[ReviewTools, Depend
     The system prompt makes the agent refuse tasks that are not about product reviews."""
     answer, steps = run_task(body.task, body.max_steps, request, tools)
     return AskResponse(task=body.task, answer=answer, model=request.app.state.settings.model, steps=steps)
+
+
+@app.post("/summarise/stream")
+def summarise_stream(
+    body: SummariseRequest, request: Request, tools: Annotated[ReviewTools, Depends(get_tools)]
+) -> StreamingResponse:
+    """Like /summarise, but the response is streamed: one JSON object per line, the agent's log lines as
+    they happen ({"log": ...}) and finally the result ({"result": ...}) or an error ({"error": ...}).
+    A client can show what the agent is doing instead of a spinner for a minute."""
+    rid = request_id.get()
+    capture = RequestLogQueue(rid)  # catches this request's log lines
+    logging.getLogger().addHandler(capture)
+    outcome: Queue[dict] = Queue()
+    task = f"Summarise the reviews of the {body.product}."
+    model = request.app.state.settings.model
+
+    def work() -> None:  # the agent runs in its own thread so the response can stream meanwhile
+        try:
+            summary, steps = run_task(task, body.max_steps, request, tools)
+            result = SummariseResponse(product=body.product, summary=summary, model=model, steps=steps)
+            outcome.put({"result": result.model_dump()})
+        except Exception as e:
+            logger.exception("agent failed")
+            outcome.put({"error": str(e)})
+
+    # copy_context: the thread keeps this request's id, so its log lines pass the handler's filter
+    Thread(target=copy_context().run, args=(work,), daemon=True).start()
+
+    def events() -> Iterator[str]:
+        try:
+            while True:
+                try:
+                    yield json.dumps({"log": capture.lines.get(timeout=0.5)}) + "\n"
+                except Empty:
+                    pass
+                if not outcome.empty():
+                    while not capture.lines.empty():  # flush the last lines before the result
+                        yield json.dumps({"log": capture.lines.get()}) + "\n"
+                    yield json.dumps(outcome.get()) + "\n"
+                    return
+        finally:
+            logging.getLogger().removeHandler(capture)
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")

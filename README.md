@@ -300,6 +300,8 @@ Read it top to bottom; it is short.
 | `SummariseRequest`, `SummariseResponse` | Pydantic models: the contract of the endpoint. FastAPI validates input against them and documents them at `/docs` |
 | `GET /health` | says the service is up and which model it uses; makes no model call |
 | `POST /summarise` | runs the agent for one product and returns the summary and the number of model calls |
+| `POST /ask` | runs the agent on a free-form task (what the chat page sends); off-topic tasks are declined by the system prompt |
+| `POST /summarise/stream` | the same as `/summarise`, but the response is *streamed*: the agent's log lines as they happen, one JSON object per line, and the result as the last line. See 4.4 |
 
 `tests/test_api.py` exercises both endpoints through FastAPI's test client with the model and the tools
 replaced by fakes, and checks that bad input is rejected with `422`:
@@ -417,7 +419,7 @@ number in their file name.
 |---|---|
 | `client.py` | the only place the UI talks to the API: `api_health`, `summarise`, `ask`. Each returns the body and the `X-Request-ID` header. `API_URL` is the one setting: `http://localhost:8000` on a laptop, `http://api:8000` inside compose |
 | `Home.py` | the health dashboard: status, model and latency as metrics, then the embedding model, the tools the agent can call and a link to `/docs`. If the API is down it says so and how to start it. Costs no model call |
-| `pages/1_📝_Summarise.py` | a list of example products to pick from, the product box, and the equivalent `curl` command to copy. The button posts to `/summarise`, renders the summary, and shows the model calls and the request id; the raw JSON sits in an expander |
+| `pages/1_📝_Summarise.py` | a list of example products to pick from, the product box, and the equivalent `curl` command to copy. The button calls `/summarise/stream`: while the agent runs, its log lines appear in a status box; when the result arrives the box folds away and the summary is rendered, with the model calls and the request id; the raw JSON sits in an expander |
 | `pages/2_💬_Chat.py` | a chat box that posts each message to `/ask`. The history lives in `st.session_state`; suggested questions sit in the sidebar |
 
 The chat page is honest about what it is: each message is an independent run of the agent, which
@@ -463,7 +465,25 @@ on a private network, and `localhost` inside the UI container is the UI containe
 has its own health check, on Streamlit's `/_stcore/health`, because the one baked into the image checks
 the API's port.
 
-### 4.3 Run and verify
+### 4.3 Watching the agent work: streaming
+
+An agent run takes about a minute. A spinner for a minute is poor manners, and the API already knows
+what is happening: it logs every search, fetch, extraction and model call. `POST /summarise/stream`
+sends those lines to the client *as they happen*, and the result when it is ready. The format is
+newline-delimited JSON: one object per line, `{"log": "..."}` while the agent runs, then
+`{"result": {...}}` or `{"error": "..."}`. Try it in a terminal and watch the lines arrive:
+
+```bash
+curl -N -X POST localhost:8000/summarise/stream -H 'Content-Type: application/json' -d '{"product": "Sony WH-1000XM5"}'
+```
+
+How it works, in `api.py`: the request id that tags every log line is what makes it possible. The endpoint
+attaches a handler that collects the lines carrying *this* request's id into a queue, runs the agent in
+a thread (with the request id copied into it), and yields from the queue while the thread works. The
+Summarise page reads the stream with `httpx`, writes the lines into a Streamlit status box, and collapses
+the box when the result line arrives, so the logs stay one click away under the summary.
+
+### 4.4 Run and verify
 
 ```bash
 docker compose up --build api ui
