@@ -141,7 +141,7 @@ uv run jupyter lab
 
 | Notebook | What it teaches |
 |----------|-----------------|
-| `notebooks/01_llm_call.ipynb` | one chat completion; switch provider by changing `.env` |
+| `notebooks/01_llm_call.ipynb` | one chat completion; what happens inside the server; why a model on its own is not enough |
 | `notebooks/02_tools.ipynb` | the tools: search, fetch page, and an aspect-based analysis (model extracts opinions, code counts them) |
 | `notebooks/03_agent_loop.ipynb` | the agent loop: model asks for tools, we run them, repeat |
 
