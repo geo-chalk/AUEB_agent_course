@@ -13,3 +13,14 @@ services:
       - ./tests:/app/tests
     extra_hosts:
       - "host.docker.internal:host-gateway" # lets the container reach Ollama on the laptop (Linux)
+
+  api:
+    build:
+      context: .
+      dockerfile: setup/Dockerfile
+    command: uvicorn aueb_agents_ca.api:app --host 0.0.0.0 --port 8000 --reload # dev only: restarts on edits
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./src:/app/src # dev only: the code that --reload watches

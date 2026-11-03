@@ -27,10 +27,11 @@ aueb_agents_CA/
 ├── .python-version         # Python version uv will use (3.13)
 ├── .env.example            # template for your secrets; copy to .env
 ├── notebooks/              # Step 1 lessons live here (img/ holds their figures)
-├── src/aueb_agents_ca/     # the Python package: settings.py (config), tools.py (tools); Step 3 adds agent.py
+├── src/aueb_agents_ca/     # the package: settings.py (config), tools.py (tools), agent.py (the loop), api.py (FastAPI)
 ├── tests/                  # pytest tests that run without internet or API keys
-├── setup/Dockerfile_dev    # Step 2: the development image (notebooks); Step 3 adds the production one
-├── docker-compose.yml      # Step 2: how to run the image (ports, .env, mounted folders)
+├── setup/Dockerfile_dev    # Step 2: the development image (notebooks)
+├── setup/Dockerfile        # Step 3: the production image (the API)
+├── docker-compose.yml      # how to run the images locally (ports, .env, mounted folders, reload)
 └── .dockerignore           # what never enters the image (.env, .venv, .git)
 ```
 
@@ -252,11 +253,98 @@ Using Ollama? Inside a container, `localhost` is the container itself. Point `.e
 
 ## Step 3: FastAPI, and Docker for production
 
-*Coming soon.* Two things happen here. The agent loop leaves notebook 03 for the package
-(`src/aueb_agents_ca/agent.py`), because a service can import a module but not a notebook. And the
-production image differs from the development one in a few deliberate ways: runtime dependencies only
-(`uv sync --frozen --no-dev`), code copied in rather than mounted, a non-root user, one process started
-by `CMD` (`uvicorn`, no `--reload`), and a health check.
+The agent becomes a web service: anything that can send an HTTP request (a UI, a script, a colleague's
+program) can ask for a summary without knowing how the agent works.
+
+### 3.1 The loop moves into the package
+
+A service can import a module but not a notebook, so the loop from notebook 03 now lives in
+`src/aueb_agents_ca/agent.py`: `run_agent` and `SYSTEM_PROMPT`, the same code, with `logging` instead of
+prints. `tests/test_agent.py` drives it with a scripted fake model and checks that tools run and that
+`max_steps` stops it.
+
+### 3.2 The web framework
+
+```bash
+uv add --optional api fastapi "uvicorn[standard]"
+```
+
+FastAPI and uvicorn go into an *optional* group called `api`, listed under `[project.optional-dependencies]`
+in `pyproject.toml`: the notebook image does not need a web server, and the API image does not need
+Jupyter. `uv sync --extra api` installs the group locally.
+
+### 3.3 The service: `src/aueb_agents_ca/api.py`
+
+Read it top to bottom; it is short.
+
+| Part | What it does |
+|---|---|
+| `lifespan` | runs once at startup: reads the settings and creates the LLM client, the HTTP client and the search engine that every request shares; closes them at shutdown |
+| `get_tools` | builds a fresh `ReviewTools` per request from those shared clients. Declared as a dependency with `Depends`, FastAPI's own dependency injection, so a test can swap it for a fake |
+| `SummariseRequest`, `SummariseResponse` | Pydantic models: the contract of the endpoint. FastAPI validates input against them and documents them at `/docs` |
+| `GET /health` | says the service is up and which model it uses; makes no model call |
+| `POST /summarise` | runs the agent for one product and returns the summary and the number of model calls |
+
+`tests/test_api.py` exercises both endpoints through FastAPI's test client with the model and the tools
+replaced by fakes, and checks that bad input is rejected with `422`:
+
+```bash
+uv run pytest
+```
+
+Run it outside Docker with:
+
+```bash
+uv run uvicorn aueb_agents_ca.api:app --reload
+```
+
+### 3.4 The production image: `setup/Dockerfile`
+
+Same skeleton as `setup/Dockerfile_dev`, different choices. Put the two files side by side:
+
+| | development (`Dockerfile_dev`) | production (`Dockerfile`) |
+|---|---|---|
+| dependencies | everything, including Jupyter, pytest, black | runtime only: `uv sync --frozen --no-dev --extra api` |
+| code | mounted from the laptop, edits are live | copied into the image: it is complete on its own |
+| user | root (needed for Jupyter in a container) | `appuser`, created in the image: a service never runs as root |
+| process | Jupyter Lab | `uvicorn`, one process, no `--reload` |
+| health | none | `HEALTHCHECK` on `/health`, so Docker can tell a hung service from a healthy one |
+
+### 3.5 Development on the production image: `docker-compose.yml`
+
+The Dockerfile is the production definition. Compose is the local run configuration, and it adds two
+things on top of the same image for development: a mounted `src/` and `--reload`, so the server restarts
+when you edit a file. Nothing in compose is used in production, where the image runs exactly as built.
+
+```yaml
+  api:
+    build:
+      context: .
+      dockerfile: setup/Dockerfile
+    command: uvicorn aueb_agents_ca.api:app --host 0.0.0.0 --port 8000 --reload   # dev only
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./src:/app/src   # dev only: the code that --reload watches
+```
+
+### 3.6 Run and verify
+
+```bash
+docker compose up --build api
+```
+
+Then, in cost order:
+
+1. `curl localhost:8000/health` and open http://localhost:8000/docs. No model call.
+2. One real request, about twenty model calls on the free tier, so run it once:
+
+```bash
+curl -X POST localhost:8000/summarise -H 'Content-Type: application/json' -d '{"product": "Sony WH-1000XM5"}'
+```
+
+The `/docs` page can send the same request from a form.
 
 ## Step 4: UI
 
