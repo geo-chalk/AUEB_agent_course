@@ -283,8 +283,11 @@ uv add --optional api fastapi "uvicorn[standard]"
 
 FastAPI and uvicorn go into an *optional* group called `api`, listed under `[project.optional-dependencies]`
 in `pyproject.toml`: the notebook image does not need a web server, and the API image does not need
-Jupyter. A plain `uv sync` leaves extras out, which is why the quick start says `uv sync --extra api`;
-without it, `tests/test_api.py` and `uvicorn` cannot import FastAPI.
+Jupyter. Note the difference between the two kinds of optional dependency: the `dev` *group* (Jupyter,
+pytest, black) is installed by default and must be excluded explicitly (`--no-dev`, as the production
+image does); an *extra* such as `api` is off by default and must be asked for. So a plain `uv sync` gives
+main + dev but no FastAPI, which is why the quick start says `uv sync --extra api`; without it,
+`tests/test_api.py` and `uvicorn` cannot import FastAPI.
 
 ### 3.3 The service: `src/aueb_agents_ca/api.py`
 
