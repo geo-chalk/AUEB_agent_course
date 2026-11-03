@@ -27,11 +27,11 @@ aueb_agents_CA/
 ├── .python-version         # Python version uv will use (3.13)
 ├── .env.example            # template for your secrets; copy to .env
 ├── notebooks/              # Step 1 lessons live here (img/ holds their figures)
-├── src/aueb_agents_ca/     # the package: settings, log, tools, agent, api (read __init__.py for the map)
+├── src/aueb_agents_ca/     # the package: settings, log, tools, agent, api, ui (read __init__.py for the map)
 ├── tests/                  # pytest tests that run without internet or API keys
 ├── logs/                   # the rotating log file lands here (ignored by git)
 ├── setup/Dockerfile_dev    # Step 2: the development image (notebooks)
-├── setup/Dockerfile        # Step 3: the production image (the API)
+├── setup/Dockerfile        # Step 3: the production image (the API; Step 4 runs the UI on it too)
 ├── docker-compose.yml      # how to run the images locally (ports, .env, mounted folders, reload)
 └── .dockerignore           # what never enters the image (.env, .venv, .git)
 ```
@@ -52,7 +52,7 @@ Or, with Docker installed, skip uv entirely:
 
 ```bash
 cp .env.example .env             # compose reads .env, so it must exist; put your Gemini key in it
-docker compose up --build        # notebooks at http://localhost:8989, API at http://localhost:8000/docs
+docker compose up --build        # notebooks :8989, API :8000/docs, UI :8501
 ```
 
 ## Choosing an LLM provider
@@ -395,6 +395,71 @@ curl -s -X POST localhost:8000/summarise -H 'Content-Type: application/json' -d 
 The response is JSON and `summary` is Markdown; `jq -r` unescapes it so it reads as written. Rendering it is
 the job of a client, which is what Step 4 builds. The `/docs` page can send the same request from a form.
 
-## Step 4: UI
+## Step 4: a simple UI
 
-*Coming soon.*
+The API answers programs. People need a page: a box to type a product name, a button, and the summary
+rendered as text rather than as JSON with `\n` in it. The page is the first *client* of the API, and it
+shows the division of labour: the API knows how to summarise, the page only knows how to ask and display.
+
+### 4.1 The page: `src/aueb_agents_ca/ui.py`
+
+```bash
+uv add --optional ui streamlit
+```
+
+Streamlit turns a script into a web page: every widget call (`st.text_input`, `st.button`) draws
+something, and the script re-runs from the top on every interaction. The page does three things:
+
+| Part | What it does |
+|---|---|
+| `api_health` | asks the API's `/health`; if it cannot be reached the page says so and stops, instead of failing later |
+| `summarise` | posts the product to `/summarise` and returns the body plus the `X-Request-ID` header |
+| `main` | the page itself: title, product box, button, spinner while the agent runs, `st.markdown` for the summary, a caption with the model, the number of model calls and the request id |
+
+The page never imports the agent. It finds the API through one environment variable, `API_URL`, which
+defaults to `http://localhost:8000` on a laptop and is set to `http://api:8000` inside compose.
+
+Run it locally, with the API already running:
+
+```bash
+uv run streamlit run src/aueb_agents_ca/ui.py
+```
+
+`tests/test_ui.py` tests the two API calls against a fake API (an `httpx` mock transport) and renders
+the page with Streamlit's `AppTest` against an address where nothing listens, checking that it shows the
+"not reachable" message.
+
+### 4.2 A second service on the production image
+
+The UI needs Streamlit, so the production image installs both extras (`--extra api --extra ui`), and
+compose runs the same image twice with different commands:
+
+```yaml
+  ui:
+    build:
+      context: .
+      dockerfile: setup/Dockerfile     # the same image as the api; only the command differs
+    command: streamlit run src/aueb_agents_ca/ui.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000        # containers reach each other by service name, not localhost
+    depends_on:
+      - api
+```
+
+Two things to notice. `API_URL` points at `api`, not `localhost`: compose gives every service a DNS name
+on a private network, and `localhost` inside the UI container is the UI container. And the `ui` service
+has its own health check, on Streamlit's `/_stcore/health`, because the one baked into the image checks
+the API's port.
+
+### 4.3 Run and verify
+
+```bash
+docker compose up --build api ui
+```
+
+Open http://localhost:8501. The caption under the title shows which model the API uses: that line proves
+the UI reached the API across the compose network, with no model call made. Typing a product and pressing
+the button runs the agent, about twenty model calls, and renders the summary. The request id in the
+caption matches the `[id]` in `docker compose logs api`, which is how you find the trace of one run.

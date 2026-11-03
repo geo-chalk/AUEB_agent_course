@@ -5,6 +5,7 @@
     tools.py     the agent's tools (search, analyse) and the JSON schemas the model sees
     agent.py     the loop: send the conversation, run the tools the model asks for, repeat
     api.py       the agent as a web service (FastAPI)
+    ui.py        a web page that is a client of the API (Streamlit); knows nothing about the agent
 
 Each module depends only on the ones above it. The notebooks under notebooks/ tell the same story in the
 same order, one lesson per file.

@@ -1,4 +1,4 @@
-# The production image for the API: self-contained, runtime dependencies only, non-root, no reload.
+# The production image for the API and the UI: self-contained, runtime dependencies only, non-root, no reload.
 # docker-compose.yml runs this same image with two development overrides (a mounted src/ and --reload).
 FROM python:3.13-slim
 
@@ -11,13 +11,13 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Runtime dependencies plus the api extra; --no-dev leaves out Jupyter, pytest and black.
+# Runtime dependencies plus the api and ui extras; --no-dev leaves out Jupyter, pytest and black.
 COPY pyproject.toml uv.lock README.md .python-version ./
-RUN uv sync --frozen --no-dev --no-install-project --extra api
+RUN uv sync --frozen --no-dev --no-install-project --extra api --extra ui
 
 # The code is copied in, not mounted: the image is complete on its own.
 COPY src ./src
-RUN uv sync --frozen --no-dev --extra api
+RUN uv sync --frozen --no-dev --extra api --extra ui
 
 # A service never runs as root.
 RUN useradd --create-home appuser && chown -R appuser /app
@@ -25,11 +25,12 @@ USER appuser
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-EXPOSE 8000
+EXPOSE 8000 8501
 
 # Lets Docker tell a hung service from a healthy one. Uses the standard library: no curl in the image.
 HEALTHCHECK --interval=30s --timeout=5s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
 # One process, no --reload: nothing changes on disk in production, and a restart would drop requests.
+# The ui service runs this same image with a different command (see docker-compose.yml).
 CMD ["uvicorn", "aueb_agents_ca.api:app", "--host", "0.0.0.0", "--port", "8000"]

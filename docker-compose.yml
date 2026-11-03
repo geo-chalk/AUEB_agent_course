@@ -26,3 +26,21 @@ services:
       - ./src:/app/src # dev only: the code that --reload watches
       - ./logs:/app/logs # the rotating log file lands on the laptop
     command: uvicorn aueb_agents_ca.api:app --host 0.0.0.0 --port 8000 --reload # dev only: restarts on edits
+
+  ui:
+    build:
+      context: .
+      dockerfile: setup/Dockerfile # the same image as the api; only the command differs
+    command: streamlit run src/aueb_agents_ca/ui.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000 # containers reach each other by service name, not localhost
+    depends_on:
+      - api
+    volumes:
+      - ./src:/app/src # dev only: streamlit re-runs the page when the file changes
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 5s
