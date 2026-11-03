@@ -1,0 +1,15 @@
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: setup/Dockerfile_dev
+    user: root
+    ports:
+      - "8989:8989"
+    env_file: .env # the key enters at run time, never into the image
+    volumes:
+      - ./notebooks:/app/notebooks # edit on the laptop, see it in the container
+      - ./src:/app/src
+      - ./tests:/app/tests
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # lets the container reach Ollama on the laptop (Linux)

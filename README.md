@@ -7,17 +7,15 @@ analyses them (which aspects people discuss, with what sentiment, backed by quot
 short, grounded summary with an LLM.
 Along the way we learn four engineering tools:
 
-| Step | Topic | Git tag |
-|------|-------|---------|
-| 1 | uv, repo setup, Python packages, notebooks | `step-1-uv` |
-| 2 | Docker | `step-2-docker` |
-| 3 | FastAPI | `step-3-api` |
-| 4 | A simple UI (Streamlit) | `step-4-ui` |
+| Step | Topic |
+|------|-------|
+| 1 | uv, repo setup, Python packages, notebooks |
+| 2 | Docker for development: the notebook image |
+| 3 | FastAPI, and Docker for production: the API image |
+| 4 | A simple UI (Streamlit), as a second service on the production image |
 
 Everything runs for free: the LLM is called through the Gemini free tier (or Groq, or a local Ollama),
 and web search uses DuckDuckGo (no key).
-
-To see the code at the end of any step: `git checkout step-1-uv` (etc.).
 
 ## Project structure
 
@@ -29,8 +27,11 @@ aueb_agents_CA/
 ├── .python-version         # Python version uv will use (3.13)
 ├── .env.example            # template for your secrets; copy to .env
 ├── notebooks/              # Step 1 lessons live here (img/ holds their figures)
-├── src/aueb_agents_ca/     # the Python package: settings.py (config), tools.py (the agent's tools)
-└── tests/                  # pytest tests that run without internet or API keys
+├── src/aueb_agents_ca/     # the Python package: settings.py (config), tools.py (tools); Step 3 adds agent.py
+├── tests/                  # pytest tests that run without internet or API keys
+├── setup/Dockerfile_dev    # Step 2: the development image (notebooks); Step 3 adds the production one
+├── docker-compose.yml      # Step 2: how to run the image (ports, .env, mounted folders)
+└── .dockerignore           # what never enters the image (.env, .venv, .git)
 ```
 
 ## Quick start (clone and run)
@@ -44,6 +45,12 @@ uv run jupyter lab           # open notebooks/
 
 [Install uv](https://docs.astral.sh/uv/getting-started/installation/) first if you do not have it.
 
+Or, with Docker installed, skip uv entirely:
+
+```bash
+docker compose up --build        # then open http://localhost:8989
+```
+
 ## Choosing an LLM provider
 
 The code talks to any provider that implements the OpenAI chat-completions API. Pick one in `.env`:
@@ -56,9 +63,10 @@ The code talks to any provider that implements the OpenAI chat-completions API. 
 
 ---
 
-# Recreate the repo from scratch
+# How the repo was built, step by step
 
-Each step below lists the exact commands that produced it.
+Each step below explains the files it added and the commands that produced them, so you can follow the
+flow or rebuild the project yourself.
 
 ## Step 1: uv, repo setup, notebooks
 
@@ -66,7 +74,6 @@ Each step below lists the exact commands that produced it.
 
 ```bash
 mkdir aueb_agents_CA && cd aueb_agents_CA
-git init -b main
 uv init --bare --python 3.13     # writes pyproject.toml
 echo "3.13" > .python-version
 mkdir -p notebooks src/aueb_agents_ca
@@ -150,7 +157,7 @@ uv run jupyter lab
 The tools used by notebook 03 live in the package, `src/aueb_agents_ca/`, so that the API can reuse them
 later: `settings.py` reads the configuration, `tools.py` holds the tools. They receive their dependencies
 (LLM client, HTTP client, search engine, settings) from the caller, which is what lets `tests/test_tools.py`
-test them with fakes, offline. Copy the three files from this tag, then run:
+test them with fakes, offline. Run the tests with:
 
 ```bash
 uv run pytest
@@ -160,20 +167,96 @@ The package version of the tools is the notebook version plus the hardening a re
 search failures returned as text, embedding requests batched and capped, empty pages skipped, logging
 instead of prints.
 
-### 1.7 Commit and tag
+## Step 2: Docker for development
 
-```bash
-git add . && git commit -m "Step 1: uv setup, notebooks and tools package"
-git tag step-1-uv
+The same code, running in a container: a student who has Docker needs nothing else, and "works on my
+machine" becomes "works in the image".
+
+This step builds a *development* image: Jupyter, the dev dependencies, the project folders mounted from
+the laptop so edits are live, running as root. It is made for working on the code, not for shipping it.
+Step 3 adds the *production* image for the API, same base and different choices, and the two side by
+side are the point of the lesson.
+
+### 2.1 Describe the image: `setup/Dockerfile_dev`
+
+Read the file top to bottom. Every instruction is a *layer*; Docker rebuilds a
+layer, and everything after it, only when its inputs change. That is why the file is ordered from the
+least to the most frequently changing thing:
+
+| Instruction | Why |
+|---|---|
+| `FROM python:3.13-slim` | the same Python as `.python-version`; nothing else is installed system-wide |
+| `COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /bin/uv` | uv, pinned to the version on our laptops, so the build is reproducible |
+| `COPY pyproject.toml uv.lock ...` then `RUN uv sync --frozen --no-install-project` | the dependencies only. Rebuilt when the lock file changes, which is rare |
+| `COPY src ./src` then `RUN uv sync --frozen` | the project itself. Rebuilt on every code change, but it only links `src/` into the venv, so it costs nothing |
+| `ENV PATH="/app/.venv/bin:$PATH"` | `python`, `pytest` and `jupyter` inside the container are the project's |
+| `CMD ["jupyter", "lab", ...]` | what runs when the container starts. `--allow-root` because containers run as root; the empty token is fine on a laptop, never on a shared server |
+
+The second `uv sync` is the line that is easy to forget: without it the package is never installed and
+`import aueb_agents_ca` fails inside the container even though `src/` was copied.
+
+### 2.2 Keep secrets out of the image: `.dockerignore`
+
+```
+.venv/
+.git/
+.env
+.idea/
+.pytest_cache/
+__pycache__/
+.ipynb_checkpoints/
 ```
 
-## Step 2: Docker
+Everything listed here is invisible to `COPY`. The key reaches the container at run time, through
+compose, and is never written into an image that could be pushed somewhere.
 
-*Coming soon.*
+### 2.3 Describe how to run it: `docker-compose.yml`
 
-## Step 3: FastAPI
+```yaml
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: setup/Dockerfile_dev
+    ports:
+      - "8989:8989"                    # laptop port : container port
+    env_file: .env                     # the key enters here, at run time
+    volumes:
+      - ./notebooks:/app/notebooks     # edit on the laptop, see it in the container
+      - ./src:/app/src
+      - ./tests:/app/tests
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets the container reach Ollama on the laptop (Linux)
+```
 
-*Coming soon.*
+Compose is the run configuration: which image, which ports, which files from the laptop are *mounted*
+into the container so edits are live, and where the environment comes from. Steps 3 and 4 add an `api`
+and a `ui` service to this same file.
+
+### 2.4 Run and verify
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:8989 and run notebook 01's first cell: if it prints the model name, the key made it
+into the container. Then check the image from the inside, without spending any quota:
+
+```bash
+docker compose exec notebook pytest
+```
+
+Using Ollama? Inside a container, `localhost` is the container itself. Point `.env` at the laptop instead:
+`LLM_BASE_URL=http://host.docker.internal:11434/v1`.
+
+
+## Step 3: FastAPI, and Docker for production
+
+*Coming soon.* Two things happen here. The agent loop leaves notebook 03 for the package
+(`src/aueb_agents_ca/agent.py`), because a service can import a module but not a notebook. And the
+production image differs from the development one in a few deliberate ways: runtime dependencies only
+(`uv sync --frozen --no-dev`), code copied in rather than mounted, a non-root user, one process started
+by `CMD` (`uvicorn`, no `--reload`), and a health check.
 
 ## Step 4: UI
 
