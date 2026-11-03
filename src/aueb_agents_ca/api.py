@@ -27,9 +27,12 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Runs once at startup: read the settings and create the clients that every request will share."""
+    # read the settings
     app.state.settings = Settings.from_env()
-    configure_logging(app.state.settings.log_level)
+    configure_logging(app.state.settings.log_level, app.state.settings.log_dir)
     logger.info("startup: model=%s base_url=%s", app.state.settings.model, app.state.settings.base_url)
+
+    # define classes needed to run the Agent
     app.state.llm = OpenAI(
         base_url=app.state.settings.base_url, api_key=app.state.settings.api_key, timeout=60, max_retries=3
     )
@@ -40,7 +43,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("shutdown")
 
 
+# the app is defined outside any function
 app = FastAPI(title="Review summariser", lifespan=lifespan)
+
+
+# --- Pyndatic classes are important when working with FastAPI
+class SummariseRequest(BaseModel):
+    product: str = Field(examples=["Sony WH-1000XM5"])
+    max_steps: int = Field(default=8, ge=1, le=20)
+
+
+class SummariseResponse(BaseModel):
+    product: str
+    summary: str
+    model: str
+    steps: int  # how many model calls the loop made
 
 
 @app.middleware("http")
@@ -62,20 +79,9 @@ def get_tools(request: Request) -> ReviewTools:
     return ReviewTools(llm=state.llm, settings=state.settings, http=state.http, search=state.search)
 
 
-class SummariseRequest(BaseModel):
-    product: str = Field(examples=["Sony WH-1000XM5"])
-    max_steps: int = Field(default=8, ge=1, le=20)
-
-
-class SummariseResponse(BaseModel):
-    product: str
-    summary: str
-    model: str
-    steps: int  # how many model calls the loop made
-
-
 @app.get("/", include_in_schema=False)
 async def docs_redirect():
+    """Redirect the landing page to docs so we can see the endpoints"""
     return RedirectResponse(url="/docs")
 
 

@@ -11,6 +11,7 @@ services:
       - ./notebooks:/app/notebooks # edit on the laptop, see it in the container
       - ./src:/app/src
       - ./tests:/app/tests
+      - ./logs:/app/logs # the rotating log file lands on the laptop
     extra_hosts:
       - "host.docker.internal:host-gateway" # lets the container reach Ollama on the laptop (Linux)
 
@@ -18,9 +19,10 @@ services:
     build:
       context: .
       dockerfile: setup/Dockerfile
-    command: uvicorn aueb_agents_ca.api:app --host 0.0.0.0 --port 8000 --reload # dev only: restarts on edits
     ports:
       - "8000:8000"
     env_file: .env
     volumes:
       - ./src:/app/src # dev only: the code that --reload watches
+      - ./logs:/app/logs # the rotating log file lands on the laptop
+    command: uvicorn aueb_agents_ca.api:app --host 0.0.0.0 --port 8000 --reload # dev only: restarts on edits

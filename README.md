@@ -352,6 +352,12 @@ aspect merge. `LOG_LEVEL=DEBUG` in `.env` adds the full tool results and extract
 docker compose logs -f api
 ```
 
+The same lines also go to a file, `logs/app.log`, mounted from the container so it lands in the repo.
+The file *rotates*: at 5 MB it becomes `app.log.1` and a fresh `app.log` starts, and the oldest of the
+five files is deleted, so the folder can never fill a disk. `LOG_DIR` in `.env` moves it; empty means
+stdout only. In a real deployment you would usually keep only stdout and let the platform collect it,
+but a local file is the quickest way to read what happened after the fact.
+
 ### 3.7 Run and verify
 
 ```bash
