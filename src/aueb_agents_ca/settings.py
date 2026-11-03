@@ -15,6 +15,7 @@ class Settings:
     api_key: str
     model: str
     embedding_model: str | None = None  # None: skip the embedding-based aspect merge
+    log_level: str = "INFO"  # DEBUG shows tool arguments and results in full
 
     @classmethod
     def from_env(cls, dotenv_path: str | Path | None = None) -> Settings:
@@ -29,4 +30,5 @@ class Settings:
             api_key=os.environ["LLM_API_KEY"],
             model=os.environ["LLM_MODEL"],
             embedding_model=os.environ.get("EMBEDDING_MODEL") or None,
+            log_level=os.environ.get("LOG_LEVEL", "INFO"),
         )

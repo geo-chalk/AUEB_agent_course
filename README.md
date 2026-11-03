@@ -329,7 +329,30 @@ when you edit a file. Nothing in compose is used in production, where the image 
       - ./src:/app/src   # dev only: the code that --reload watches
 ```
 
-### 3.6 Run and verify
+### 3.6 Logs: knowing what the agent did
+
+A service you cannot watch needs to tell you what it did. `src/aueb_agents_ca/log.py` sets up one format
+for every line, printed to stdout, which is where Docker collects logs:
+
+```
+2026-11-03 21:40:12,118 INFO [3f9a1c2e] aueb_agents_ca.agent: step 1: model asks for analyze_pages({"urls": [...]})
+```
+
+The bracketed value is the **request id**: the API gives each request one, every log line produced while
+serving it carries it, and the response returns it in the `X-Request-ID` header. When two requests
+overlap, their lines can still be told apart; when a user reports a bad answer, the id finds its trace.
+
+What gets logged, at `INFO`: startup (model and provider), each request (product, duration, number of
+model calls), each model call (duration, finish reason, prompt and completion tokens), each tool call the
+model asks for (name and arguments) and what it returned (size and duration), and inside the tools each
+search (query and result count), each fetch (URL and size), each extraction (opinions found) and each
+aspect merge. `LOG_LEVEL=DEBUG` in `.env` adds the full tool results and extracted opinions.
+
+```bash
+docker compose logs -f api
+```
+
+### 3.7 Run and verify
 
 ```bash
 docker compose up --build api

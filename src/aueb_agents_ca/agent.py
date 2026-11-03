@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 from openai import OpenAI
@@ -32,20 +33,48 @@ def run_agent(
 ) -> tuple[str, Conversation]:
     """Run the agent loop on one task. Returns the final answer and the full conversation."""
     messages: Conversation = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": task}]
+    logger.info("agent start: task=%r model=%s max_steps=%d", task, model, max_steps)
+    started = time.perf_counter()
 
     for step in range(max_steps):
+        t0 = time.perf_counter()
         response = llm.chat.completions.create(model=model, messages=messages, tools=TOOL_SCHEMAS)
         message = response.choices[0].message
         messages.append(message)  # the object itself: some providers attach fields that must be sent back
-        logger.info("step %d: finish_reason=%s", step, response.choices[0].finish_reason)
+        usage = getattr(response, "usage", None)
+        logger.info(
+            "step %d: model call took %.1fs, finish_reason=%s, prompt_tokens=%s, completion_tokens=%s",
+            step,
+            time.perf_counter() - t0,
+            response.choices[0].finish_reason,
+            getattr(usage, "prompt_tokens", None),
+            getattr(usage, "completion_tokens", None),
+        )
 
         if not message.tool_calls:  # no tool requested: this is the final answer
+            logger.info(
+                "agent done: %d model calls, %d characters, %.1fs",
+                step + 1,
+                len(message.content or ""),
+                time.perf_counter() - started,
+            )
             return message.content, messages
 
         for call in message.tool_calls:  # run every requested tool and report back
             args: dict[str, Any] = json.loads(call.function.arguments)
-            logger.info("   -> %s(%s)", call.function.name, json.dumps(args)[:100])
+            logger.info("step %d: model asks for %s(%s)", step, call.function.name, json.dumps(args)[:200])
+            t0 = time.perf_counter()
             result: Any = tools.registry[call.function.name](**args)
-            messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(result)})
+            content = json.dumps(result)
+            logger.info(
+                "step %d: %s returned %d characters in %.1fs",
+                step,
+                call.function.name,
+                len(content),
+                time.perf_counter() - t0,
+            )
+            logger.debug("step %d: %s result: %s", step, call.function.name, content)
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": content})
 
+    logger.warning("agent stopped: %d steps without a final answer", max_steps)
     return "Stopped: too many steps without a final answer.", messages

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections import Counter
 from collections.abc import Callable
 
@@ -70,7 +71,9 @@ class ReviewTools:
             results = self.search.text(query, max_results=max_results)
         except DDGSException as e:
             # The search backend throttles now and then. Report it as text; the model can rephrase and retry.
+            logger.warning("search %r failed: %s", query, e)
             return f"ERROR: search failed for {query!r}: {e}"
+        logger.info("search %r: %d results", query, len(results))
         # Keep only what the agent needs; every field here ends up as tokens in the prompt.
         return [{"title": r["title"], "url": r["href"], "snippet": r["body"]} for r in results]
 
@@ -85,9 +88,11 @@ class ReviewTools:
             response.raise_for_status()  # turns 403, 404, 500 ... into an exception
         except httpx.HTTPError as e:
             # A tool must never crash the agent: report the problem as text instead.
+            logger.warning("fetch %s failed: %s", url, e)
             return f"ERROR: could not fetch {url}: {e}"
         text = (trafilatura.extract(response.text) or "")[:max_chars]
         self.pages[url] = text
+        logger.info("fetched %s: %d characters of readable text", url, len(text))
         return text
 
     def analyze_pages(self, urls: list[str]) -> dict:
@@ -101,7 +106,9 @@ class ReviewTools:
                 texts.append(text)
                 used.append(url)
         if not texts:
+            logger.warning("analyze_pages: none of the %d pages could be fetched", len(urls))
             return {"error": "none of the pages could be fetched", "failed": failed}
+        logger.info("analyze_pages: %d pages to analyse, %d failed", len(used), len(failed))
         return {"pages_analyzed": used, "pages_failed": failed, "aspects": self.analyze_reviews(texts)}
 
     @property
@@ -113,6 +120,7 @@ class ReviewTools:
 
     def extract_opinions(self, text: str) -> list[dict]:
         """Ask the model to list every opinion in a review as (aspect, sentiment, quote)."""
+        t0 = time.perf_counter()
         response = self.llm.chat.completions.create(
             model=self.settings.model,
             messages=[{"role": "system", "content": EXTRACT_PROMPT}, {"role": "user", "content": text}],
@@ -121,7 +129,15 @@ class ReviewTools:
                 "json_schema": {"name": "opinions", "schema": OPINION_SCHEMA},
             },
         )
-        return json.loads(response.choices[0].message.content)["opinions"]
+        opinions = json.loads(response.choices[0].message.content)["opinions"]
+        logger.info(
+            "extracted %d opinions from %d characters in %.1fs",
+            len(opinions),
+            len(text),
+            time.perf_counter() - t0,
+        )
+        logger.debug("opinions: %s", opinions)
+        return opinions
 
     def embed(self, texts: list[str], batch_size: int = 100) -> np.ndarray:
         """One unit-length vector per text, as rows of a matrix. Sent in batches: providers cap the batch size."""
@@ -157,9 +173,16 @@ class ReviewTools:
             best_score, best_name = max(similarities, default=(0.0, None))
             if best_score >= threshold:
                 mapping[name] = best_name  # close enough to an existing aspect: merge into it
+                logger.info("merged aspect %r into %r (similarity %.2f)", name, best_name, best_score)
             else:
                 mapping[name] = name  # new aspect
                 kept.append(name)
+        logger.info(
+            "aspects: %d distinct names, %d embedded, %d kept after merging",
+            len(unique),
+            len(head),
+            len(kept),
+        )
         return mapping
 
     def analyze_reviews(self, texts: list[str], max_quotes: int = 2) -> list[dict]:
@@ -184,7 +207,11 @@ class ReviewTools:
             if len(row["quotes"]) < max_quotes:
                 row["quotes"].append(opinion["quote"])
 
-        return sorted(table.values(), key=lambda r: -(r["positive"] + r["negative"] + r["mixed"]))
+        rows = sorted(table.values(), key=lambda r: -(r["positive"] + r["negative"] + r["mixed"]))
+        logger.info(
+            "aspect table: %d aspects from %d opinions across %d texts", len(rows), len(opinions), len(texts)
+        )
+        return rows
 
 
 # What the model sees: one JSON schema per tool. The description is all it has to decide when to call it.

@@ -29,3 +29,15 @@ def test_loop_stops_after_max_steps():
 
     assert answer.startswith("Stopped")
     assert len(llm.calls) == 3
+
+
+def test_loop_logs_every_model_call_and_tool_call(caplog):
+    llm = ScriptedLLM([message(tool_calls=[tool_call("search_reviews", query="x")]), message(content="done")])
+
+    with caplog.at_level("INFO"):
+        run_agent("task", llm, FAKE_TOOLS, "fake-model")
+
+    assert "agent start: task='task' model=fake-model" in caplog.text
+    assert "step 0: model asks for search_reviews" in caplog.text
+    assert "step 0: search_reviews returned" in caplog.text
+    assert "agent done: 2 model calls" in caplog.text
