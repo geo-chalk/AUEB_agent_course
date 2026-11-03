@@ -19,7 +19,7 @@ from starlette.responses import RedirectResponse
 from aueb_agents_ca.agent import run_agent
 from aueb_agents_ca.log import configure_logging, request_id
 from aueb_agents_ca.settings import Settings
-from aueb_agents_ca.tools import ReviewTools
+from aueb_agents_ca.tools import TOOL_SCHEMAS, ReviewTools
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,18 @@ class SummariseResponse(BaseModel):
     steps: int  # how many model calls the loop made
 
 
+class AskRequest(BaseModel):
+    task: str = Field(examples=["What do reviewers dislike about the Sony WH-1000XM5?"])
+    max_steps: int = Field(default=8, ge=1, le=20)
+
+
+class AskResponse(BaseModel):
+    task: str
+    answer: str
+    model: str
+    steps: int
+
+
 @app.middleware("http")
 async def tag_request(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     """Give every request a short id: every log line it produces carries it, and so does the response."""
@@ -79,19 +91,31 @@ def get_tools(request: Request) -> ReviewTools:
     return ReviewTools(llm=state.llm, settings=state.settings, http=state.http, search=state.search)
 
 
+def run_task(task: str, max_steps: int, request: Request, tools: ReviewTools) -> tuple[str, int]:
+    """Run the agent on one task and return its answer and the number of model calls it made."""
+    state = request.app.state
+    logger.info("agent task=%r max_steps=%d", task, max_steps)
+    t0 = time.perf_counter()
+    answer, conversation = run_agent(task, state.llm, tools, state.settings.model, max_steps)
+    steps = sum(1 for m in conversation if not isinstance(m, dict))  # the model's messages = model calls
+    logger.info("agent done in %.1fs, %d model calls", time.perf_counter() - t0, steps)
+    return answer, steps
+
+
 @app.get("/", include_in_schema=False)
 async def docs_redirect():
-    """Redirect the landing page to docs so we can see the endpoints"""
     return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
 def health(request: Request) -> dict:
     """Cheap check that the service is up and configured; it makes no model call."""
+    settings = request.app.state.settings
     return {
         "status": "ok",
-        "model": request.app.state.settings.model,
-        "embedding_model": request.app.state.settings.embedding_model,
+        "model": settings.model,
+        "embedding_model": settings.embedding_model,
+        "tools": [schema["function"]["name"] for schema in TOOL_SCHEMAS],
     }
 
 
@@ -99,17 +123,16 @@ def health(request: Request) -> dict:
 def summarise(
     body: SummariseRequest, request: Request, tools: Annotated[ReviewTools, Depends(get_tools)]
 ) -> SummariseResponse:
-    """Run the agent for one product. Costs about twenty model requests on the free tier."""
-    state = request.app.state
-    logger.info("summarise: product=%r max_steps=%d", body.product, body.max_steps)
-    t0 = time.perf_counter()
-    summary, conversation = run_agent(
-        f"Summarise the reviews of the {body.product}.",
-        state.llm,
-        tools,
-        state.settings.model,
-        body.max_steps,
+    """Summarise the reviews of one product. Costs about twenty model requests on the free tier."""
+    summary, steps = run_task(f"Summarise the reviews of the {body.product}.", body.max_steps, request, tools)
+    return SummariseResponse(
+        product=body.product, summary=summary, model=request.app.state.settings.model, steps=steps
     )
-    steps = sum(1 for m in conversation if not isinstance(m, dict))  # the model's messages = model calls
-    logger.info("summarise: done in %.1fs, %d model calls", time.perf_counter() - t0, steps)
-    return SummariseResponse(product=body.product, summary=summary, model=state.settings.model, steps=steps)
+
+
+@app.post("/ask", response_model=AskResponse)
+def ask(body: AskRequest, request: Request, tools: Annotated[ReviewTools, Depends(get_tools)]) -> AskResponse:
+    """Run the agent on a free-form task about a product's reviews (what the chat page sends).
+    The system prompt makes the agent refuse tasks that are not about product reviews."""
+    answer, steps = run_task(body.task, body.max_steps, request, tools)
+    return AskResponse(task=body.task, answer=answer, model=request.app.state.settings.model, steps=steps)

@@ -43,5 +43,21 @@ def test_summarise_logs_what_happened(monkeypatch, caplog):
         client.post("/summarise", json={"product": "XM5"})
     app.dependency_overrides.clear()
 
-    assert "summarise: product='XM5'" in caplog.text
+    assert "agent task='Summarise the reviews of the XM5.'" in caplog.text
     assert "agent done: 1 model calls" in caplog.text
+
+
+def test_ask_runs_the_agent_on_a_free_form_task(monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "http://fake")
+    monkeypatch.setenv("LLM_API_KEY", "fake")
+    monkeypatch.setenv("LLM_MODEL", "fake-model")
+    app.dependency_overrides[get_tools] = lambda: FAKE_TOOLS
+    with TestClient(app) as client:
+        client.app.state.llm = ScriptedLLM([message(content="Reviewers dislike the price.")])
+        response = client.post("/ask", json={"task": "What do reviewers dislike about the XM5?"})
+        health = client.get("/health").json()
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200, response.text
+    assert response.json()["answer"] == "Reviewers dislike the price." and response.json()["steps"] == 1
+    assert health["tools"] == ["search_reviews", "analyze_pages"]

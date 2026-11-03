@@ -27,7 +27,7 @@ aueb_agents_CA/
 ├── .python-version         # Python version uv will use (3.13)
 ├── .env.example            # template for your secrets; copy to .env
 ├── notebooks/              # Step 1 lessons live here (img/ holds their figures)
-├── src/aueb_agents_ca/     # the package: settings, log, tools, agent, api, ui (read __init__.py for the map)
+├── src/aueb_agents_ca/     # the package: settings, log, tools, agent, api, ui/ (read __init__.py for the map)
 ├── tests/                  # pytest tests that run without internet or API keys
 ├── logs/                   # the rotating log file lands here (ignored by git)
 ├── setup/Dockerfile_dev    # Step 2: the development image (notebooks)
@@ -397,36 +397,46 @@ the job of a client, which is what Step 4 builds. The `/docs` page can send the 
 
 ## Step 4: a simple UI
 
-The API answers programs. People need a page: a box to type a product name, a button, and the summary
-rendered as text rather than as JSON with `\n` in it. The page is the first *client* of the API, and it
-shows the division of labour: the API knows how to summarise, the page only knows how to ask and display.
+The API answers programs. People need pages: a dashboard that says whether the service is up, a form
+that turns a product name into a rendered summary, and a chat box for questions in their own words.
+The pages are *clients* of the API, and that is the division of labour to notice: the API knows how to
+run the agent; the pages only know how to ask and display.
 
-### 4.1 The page: `src/aueb_agents_ca/ui.py`
+### 4.1 The pages: `src/aueb_agents_ca/ui/`
 
 ```bash
 uv add --optional ui streamlit
 ```
 
-Streamlit turns a script into a web page: every widget call (`st.text_input`, `st.button`) draws
-something, and the script re-runs from the top on every interaction. The page does three things:
+Streamlit turns a script into a web page: every widget call (`st.text_input`, `st.button`,
+`st.chat_input`) draws something, and the script re-runs from the top on every interaction. A folder with
+an entry script and a `pages/` directory becomes a multi-page app with a sidebar, pages ordered by the
+number in their file name.
 
-| Part | What it does |
+| File | What it does |
 |---|---|
-| `api_health` | asks the API's `/health`; if it cannot be reached the page says so and stops, instead of failing later |
-| `summarise` | posts the product to `/summarise` and returns the body plus the `X-Request-ID` header |
-| `main` | the page itself: title, product box, button, spinner while the agent runs, `st.markdown` for the summary, a caption with the model, the number of model calls and the request id |
+| `api_client.py` | the only place the UI talks to the API: `api_health`, `summarise`, `ask`. Each returns the body and the `X-Request-ID` header. `API_URL` is the one setting: `http://localhost:8000` on a laptop, `http://api:8000` inside compose |
+| `Home.py` | the health dashboard: status, model and latency as metrics, then the embedding model, the tools the agent can call and a link to `/docs`. If the API is down it says so and how to start it. Costs no model call |
+| `pages/1_📝_Summarise.py` | a list of example products to pick from, the product box, and the equivalent `curl` command to copy. The button posts to `/summarise`, renders the summary, and shows the model calls and the request id; the raw JSON sits in an expander |
+| `pages/2_💬_Chat.py` | a chat box that posts each message to `/ask`. The history lives in `st.session_state`; suggested questions sit in the sidebar |
 
-The page never imports the agent. It finds the API through one environment variable, `API_URL`, which
-defaults to `http://localhost:8000` on a laptop and is set to `http://api:8000` inside compose.
+The chat page is honest about what it is: each message is an independent run of the agent, which
+searches, analyses, answers and forgets. There is no memory between messages, so the product must be
+named every time, and a question that is not about product reviews gets the "not supported" answer
+from the system prompt. Giving the agent memory of the conversation would be the next lesson.
 
-Run it locally, with the API already running:
+`/ask` is the one endpoint added to the API for the chat: it takes a free-form `task` instead of a
+product name and runs the same loop. `/summarise` is now a thin wrapper that builds the task from the
+product.
+
+Run the pages locally, with the API already running:
 
 ```bash
-uv run streamlit run src/aueb_agents_ca/ui.py
+uv run streamlit run src/aueb_agents_ca/ui/Home.py
 ```
 
-`tests/test_ui.py` tests the two API calls against a fake API (an `httpx` mock transport) and renders
-the page with Streamlit's `AppTest` against an address where nothing listens, checking that it shows the
+`tests/test_ui.py` tests the API calls against a fake API (an `httpx` mock transport) and renders every
+page with Streamlit's `AppTest` against an address where nothing listens, checking that each shows the
 "not reachable" message.
 
 ### 4.2 A second service on the production image
@@ -439,7 +449,7 @@ compose runs the same image twice with different commands:
     build:
       context: .
       dockerfile: setup/Dockerfile     # the same image as the api; only the command differs
-    command: streamlit run src/aueb_agents_ca/ui.py --server.port 8501 --server.address 0.0.0.0
+    command: streamlit run src/aueb_agents_ca/ui/Home.py --server.port 8501 --server.address 0.0.0.0
     ports:
       - "8501:8501"
     environment:
@@ -459,7 +469,7 @@ the API's port.
 docker compose up --build api ui
 ```
 
-Open http://localhost:8501. The caption under the title shows which model the API uses: that line proves
-the UI reached the API across the compose network, with no model call made. Typing a product and pressing
-the button runs the agent, about twenty model calls, and renders the summary. The request id in the
-caption matches the `[id]` in `docker compose logs api`, which is how you find the trace of one run.
+Open http://localhost:8501. The home page's metrics prove the UI reached the API across the compose
+network, with no model call made. On the Summarise page, pick an example and press the button: about
+twenty model calls, and the summary renders. The request id in the caption matches the `[id]` in
+`docker compose logs api`, which is how you find the trace of one run.

@@ -31,7 +31,7 @@ services:
     build:
       context: .
       dockerfile: setup/Dockerfile # the same image as the api; only the command differs
-    command: streamlit run src/aueb_agents_ca/ui.py --server.port 8501 --server.address 0.0.0.0
+    command: streamlit run src/aueb_agents_ca/ui/Home.py --server.port 8501 --server.address 0.0.0.0
     ports:
       - "8501:8501"
     environment:
