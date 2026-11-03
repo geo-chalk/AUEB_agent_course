@@ -502,31 +502,50 @@ twenty model calls, and the summary renders. The request id in the caption match
 
 ## Step 5: exercise, a picture for the summary
 
-The summary is text. A product page would show a picture of the product above it. Your job is to add
+The summary is text. A product page would show a picture of the product next to it. Your job is to add
 that, through every layer of the course: a new tool, the agent, the API and the page. Image search is
 free (no model quota), so iterate as much as you like; only a full run through the page costs the usual
 twenty model calls.
 
-Everything you need to change is marked `Exercise 5.x` in the code. Work in this order:
+Everything you need to change is marked `Exercise 5.x` in the code. The core gets a picture on the page;
+the extensions make it robust. Do the core first, in order.
+
+### Core
 
 | Step | File | What to do |
 |---|---|---|
-| 5.1 | `src/aueb_agents_ca/tools.py`, `find_product_image` | one image search with `self.search.images(query=..., max_results=...)`, same engine as `search_reviews`; each result has `image`, `thumbnail`, `url` and `title`. Keep the full result on `self.image` for the API, the way `fetch_page` keeps pages, and return only the title and source page to the model. Never raise: return an `ERROR: ...` string when nothing is found. Log what you found |
-| 5.2 | `tools.py`, `registry` and `TOOL_SCHEMAS` | register the tool and describe it to the model: a name, a one-sentence description, one `product` parameter. The description is all the model has |
-| 5.3 | `src/aueb_agents_ca/agent.py`, `SYSTEM_PROMPT` | one sentence asking the model to call the tool once. Try without it first and see how often the model calls the tool on its own |
+| 5.1 | `src/aueb_agents_ca/tools.py`, `find_product_image` | one image search with `self.search.images(query=..., max_results=...)`, same engine as `search_reviews`; each result has `image`, `thumbnail`, `url` and `title`. Keep the full result on `self.image` for the API, the way `fetch_page` keeps pages, and return only the title and the source page to the model: give it no URL. Never raise: return an `ERROR: ...` string when nothing is found. Log what you found |
+| 5.2 | `tools.py`, `registry` and `TOOL_SCHEMAS` | register the tool and describe it to the model: a name, a one-sentence description, one `product` parameter. Copy the shape of the entry above it |
 | 5.4 | `src/aueb_agents_ca/api.py`, `product_image` | return what the agent found, `tools.image`, as a `ProductImage`; both `/summarise` and `/summarise/stream` already call this function |
-| 5.5 | `api.py`, same function | the model sometimes skips the tool. If `tools.image` is empty, call the tool yourself before answering: what the service can guarantee should not be left to the model |
-| 5.6 | `src/aueb_agents_ca/ui/pages/1_📝_Summarise.py` | show a *small* picture beside the product name (`st.columns`, `st.image` with a width of about 110 px), the title linking to the source page. A full-width image looks bad with many results. Which URL to show, `thumbnail` or `url`? Try both. And strip any image the model pasted into the summary before rendering it: the page shows the picture, not the model |
+| 5.6 | `src/aueb_agents_ca/ui/pages/1_📝_Summarise.py` | show a *small* picture beside the product name: `st.columns([1, 5])`, `st.image(..., width=110)` in the narrow one, the title linking to the source page in the wide one. Show the `thumbnail`: the original `url` often refuses to load inside another site; try it and see |
 
-Check your tool on its own, for free, before touching the rest:
+Check 5.1 on its own, for free, before touching the rest:
 
 ```bash
 uv run python -c "from aueb_agents_ca.tools import build_tools; t = build_tools(); print(t.find_product_image(product='Sony WH-1000XM5')); print(t.image)"
 ```
 
+When it is right you see something like this: a short dict for the model, then the full one kept for the API.
+
+```
+{'title': 'Sony WH-1000XM5 Wireless Noise Cancelling Headphones | Sony Electronics', 'source': 'https://electronics.sony.ca/...'}
+{'url': 'https://....webp', 'thumbnail': 'https://ts4.mm.bing.net/th?id=...', 'source': 'https://electronics.sony.ca/...', 'title': 'Sony WH-1000XM5 ...'}
+```
+
 Then the whole path: `docker compose up --build api ui`, open the Summarise page, pick a product and press
-the button. The log lines streamed to the page show whether the model called your tool or the fallback
-did. Conventions to keep: keyword-only arguments, errors as text, a log line per thing that happens.
+the button. You do not need to rebuild after each edit: `src/` is mounted into both containers, the API
+restarts on save, and the page re-runs on the next button press. The log lines streamed to the page show
+whether the model called your tool.
+
+### Extensions
+
+| Step | File | What to do |
+|---|---|---|
+| 5.3 | `src/aueb_agents_ca/agent.py`, `SYSTEM_PROMPT` | run the core version three times and count how often the model calls the tool on its own. Then add one sentence to the plan asking it to call `find_product_image` once, and that the page shows the picture, and count again |
+| 5.5 | `api.py`, `product_image` | the model sometimes skips the tool even when asked. If `tools.image` is empty, call the tool yourself before answering: what the service can guarantee should not be left to the model |
+| safety net | the Summarise page | a model given a URL sometimes pastes an image into its Markdown, which renders broken. Strip image syntax before rendering: `re.sub(r"!\[[^\]]*\]\([^)]*\)", "", summary)` |
+
+Conventions to keep: keyword-only arguments, errors as text, a log line per thing that happens.
 
 Bonus question, for after it works: should the agent have this tool at all, given 5.5? Notebook 03 argued
 for giving the model only the tools the task needs. Make the case for each side in two sentences.

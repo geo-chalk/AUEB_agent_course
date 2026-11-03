@@ -65,10 +65,11 @@ if st.button("Summarise", type="primary", disabled=not product):
     if error or result is None:
         st.error(error or "The API closed the stream without a result.")
         st.stop()
-    # Exercise 5.6: when result["image"] is present, show a small picture (st.image with a width of about
-    # 110 px) beside the product name, using st.columns, with the title linking to the source page.
-    # Which of "thumbnail" and "url" should you display? And what if the model pasted an image into the
-    # summary anyway? (A regex over result["summary"] before st.markdown is the safety net.)
+    # Exercise 5.6 (core): when result["image"] is present, show a small picture beside the product name:
+    #   picture, heading = st.columns([1, 5]); picture.image(..., width=110); heading.subheader(...)
+    # with the title linking to the source page. Show the "thumbnail"; try "url" and see what happens.
+    # Extension (safety net): if the model pasted an image into the summary, strip it before rendering:
+    #   re.sub(r"!\[[^\]]*\]\([^)]*\)", "", result["summary"])
     st.markdown(result["summary"])
     st.caption(f"{result['steps']} model calls · {result['model']} · request `{request_id}`")
     with st.expander("The raw API response"):
