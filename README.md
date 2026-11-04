@@ -40,10 +40,10 @@ aueb_agents_CA/
 
 ```bash
 git clone <this repo> && cd aueb_agents_CA
-uv sync --extra api          # creates .venv and installs everything from uv.lock, including the API's packages
-cp .env.example .env         # then put your Gemini key in .env
-uv run pytest                # 19 tests, no internet or key needed: the setup works
-uv run jupyter lab           # open notebooks/
+uv sync --extra api --extra ui   # creates .venv and installs everything from uv.lock, including the API and UI packages
+cp .env.example .env             # then put your Gemini key in .env
+uv run pytest                    # 25 tests, no internet or key needed: the setup works
+uv run jupyter lab               # open notebooks/
 ```
 
 [Install uv](https://docs.astral.sh/uv/getting-started/installation/) first if you do not have it.
@@ -128,7 +128,12 @@ LLM_MODEL=gemini-3.5-flash-lite
 EMBEDDING_MODEL=gemini-embedding-001
 ```
 
-The committed `.env.example` also lists the Groq and Ollama settings, commented out.
+The committed `.env.example` also lists the Groq and Ollama settings, commented out. Then make your own copy
+and put your key in it:
+
+```bash
+cp .env.example .env
+```
 
 Create `.gitignore`:
 
@@ -172,6 +177,10 @@ One convention holds everywhere in the package, the tests and the notebooks: eve
 passes (`run_agent(task=..., llm=..., tools=..., model=...)`). Calls stay readable when a function has
 several arguments of the same type, adding or reordering a parameter cannot silently change a call's
 meaning, and a tool's arguments match the names in its schema, which is how the model calls it anyway.
+
+Two helpers sit next to the tests: `tests/fakes.py` holds the stand-ins for the model that several test
+files share, and `tests/conftest.py` gives every test fake settings, so pytest needs no `.env` and writes
+no log file. `pythonpath = ["tests"]` in `pyproject.toml` is what lets a test write `from fakes import ...`.
 
 The package version of the tools is the notebook version plus the hardening a real service needs:
 search failures returned as text, embedding requests batched and capped, empty pages skipped, logging
@@ -249,8 +258,8 @@ and a `ui` service to this same file.
 docker compose up --build notebook
 ```
 
-Open http://localhost:8989 and run notebook 01's first cell: if it prints the model name, the key made it
-into the container. Then check the image from the inside, without spending any quota:
+Open http://localhost:8989 and run the cell of notebook 01 that prints the model name: if it does, the key
+made it into the container. Then check the image from the inside, without spending any quota:
 
 ```bash
 docker compose exec notebook pytest
@@ -292,8 +301,8 @@ in `pyproject.toml`: the notebook image does not need a web server, and the API 
 Jupyter. Note the difference between the two kinds of optional dependency: the `dev` *group* (Jupyter,
 pytest, black) is installed by default and must be excluded explicitly (`--no-dev`, as the production
 image does); an *extra* such as `api` is off by default and must be asked for. So a plain `uv sync` gives
-main + dev but no FastAPI, which is why the quick start says `uv sync --extra api`; without it,
-`tests/test_api.py` and `uvicorn` cannot import FastAPI.
+main + dev but no FastAPI, which is why the quick start says `uv sync --extra api --extra ui` (the `ui`
+extra arrives in Step 4); without it, `tests/test_api.py` and `uvicorn` cannot import FastAPI.
 
 ### 3.3 The service: `src/aueb_agents_ca/api.py`
 
@@ -307,9 +316,9 @@ Read it top to bottom; it is short.
 | `GET /health` | says the service is up and which model it uses; makes no model call |
 | `POST /summarise` | runs the agent for one product and returns the summary and the number of model calls |
 | `POST /ask` | runs the agent on a free-form task (what the chat page sends); off-topic tasks are declined by the system prompt |
-| `POST /summarise/stream` | the same as `/summarise`, but the response is *streamed*: the agent's log lines as they happen, one JSON object per line, and the result as the last line. See 4.4 |
+| `POST /summarise/stream` | the same as `/summarise`, but the response is *streamed*: the agent's log lines as they happen, one JSON object per line, and the result as the last line. See 4.3 |
 
-`tests/test_api.py` exercises both endpoints through FastAPI's test client with the model and the tools
+`tests/test_api.py` exercises the endpoints through FastAPI's test client with the model and the tools
 replaced by fakes, and checks that bad input is rejected with `422`:
 
 ```bash
@@ -378,10 +387,12 @@ docker compose logs -f api
 
 `LOG_LEVEL` and `LOG_DIR` are two more lines in `.env.example`, read by `settings.py` like the others.
 
-The same lines also go to a file, `logs/app.log`, mounted from the container so it lands in the repo
-(`./logs:/app/logs` in both compose services; `logs/*` is git-ignored and `logs/` is in `.dockerignore`).
-The file *rotates*: at 5 MB it becomes `app.log.1` and a fresh `app.log` starts, and the oldest of the
-five files is deleted, so the folder can never fill a disk. `LOG_DIR` in `.env` moves it; empty means
+The same lines also go to a file, `logs/app.log`, mounted from the container so it lands in the repo.
+The file *rotates*: at 0.5 MB it becomes `app.log.1` and a fresh `app.log` starts, and the oldest of the
+five files is deleted, so the folder can never fill a disk. If the file cannot be opened (a mounted folder
+owned by another user, say), the service logs a warning and carries on with stdout only.
+This step adds `logs/*` and `!logs/.gitkeep` to `.gitignore` (the empty `.gitkeep` keeps the folder in the
+repo), `logs/` to `.dockerignore`, and the `./logs:/app/logs` volume to the compose services. `LOG_DIR` in `.env` moves it; empty means
 stdout only. In a real deployment you would usually keep only stdout and let the platform collect it,
 but a local file is the quickest way to read what happened after the fact.
 
@@ -414,6 +425,7 @@ run the agent; the pages only know how to ask and display.
 
 ```bash
 uv add --optional ui streamlit
+uv sync --extra api --extra ui   # from now on, sync both extras (what the quick start does)
 ```
 
 Streamlit turns a script into a web page: every widget call (`st.text_input`, `st.button`,
@@ -423,9 +435,9 @@ number in their file name.
 
 | File | What it does |
 |---|---|
-| `client.py` | the only place the UI talks to the API: `api_health`, `summarise`, `ask`. Each returns the body and the `X-Request-ID` header. `API_URL` is the one setting: `http://localhost:8000` on a laptop, `http://api:8000` inside compose |
+| `client.py` | the only place the UI talks to the API: `api_health`, `summarise`, `stream_summarise`, `ask`. Each returns the body and the `X-Request-ID` header. `API_URL` is the one setting: `http://localhost:8000` on a laptop, `http://api:8000` inside compose |
 | `Home.py` | the health dashboard: status, model and latency as metrics, then the embedding model, the tools the agent can call and a link to `/docs`. If the API is down it says so and how to start it. Costs no model call |
-| `pages/1_📝_Summarise.py` | a list of example products to pick from, the product box, and the equivalent `curl` command to copy. A slider sets `max_steps`, the loop's safety net (1 to 20, default 8). The button calls `/summarise/stream`: while the agent runs, its log lines appear in a status box; when the result arrives the box folds away and the summary is rendered, with the model calls and the request id; the raw JSON sits in an expander |
+| `pages/1_📝_Summarise.py` | a list of example products to pick from and the product box. A slider sets `max_steps`, the loop's safety net (1 to 20, default 8). The button calls `/summarise/stream`: while the agent runs, its log lines appear in a status box; when the result arrives the box folds away and the summary is rendered, with the model calls and the request id; the raw JSON sits in an expander |
 | `pages/2_💬_Chat.py` | a chat box that posts each message to `/ask`. The history lives in `st.session_state`; suggested questions and the `max_steps` slider sit in the sidebar |
 
 The chat page is honest about what it is: each message is an independent run of the agent, which

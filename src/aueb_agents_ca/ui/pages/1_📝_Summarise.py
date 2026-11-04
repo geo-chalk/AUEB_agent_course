@@ -1,4 +1,4 @@
-"""Summarise: one product in, one summary out. The page is a client of POST /summarise."""
+"""Summarise: one product in, one summary out. The page is a client of POST /summarise/stream."""
 
 import httpx
 import streamlit as st

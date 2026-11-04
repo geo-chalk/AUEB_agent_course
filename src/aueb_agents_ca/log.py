@@ -21,7 +21,7 @@ FORMAT = "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"
 CHATTY_LIBRARIES = ("httpx", "httpx2", "httpcore", "httpcore2", "primp")
 
 # The log file rotates: when app.log reaches MAX_BYTES it becomes app.log.1 and a fresh app.log starts,
-# and the oldest of the BACKUP_COUNT rotated files is deleted. Five files of 5 MB at most on disk.
+# and the oldest of the BACKUP_COUNT rotated files is deleted. Five files of 0.5 MB at most on disk.
 LOG_FILE = "app.log"
 MAX_BYTES = 0.5 * 1024 * 1024
 BACKUP_COUNT = 4
@@ -49,19 +49,27 @@ def configure_logging(*, level: str = "INFO", log_dir: str | Path | None = "logs
         handler.close()
 
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]  # stdout: what Docker collects
+    file_error: OSError | None = None
     if log_dir is not None:
-        Path(log_dir).mkdir(parents=True, exist_ok=True)
-        handlers.append(
-            RotatingFileHandler(
-                Path(log_dir) / LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8"
+        try:
+            Path(log_dir).mkdir(parents=True, exist_ok=True)
+            handlers.append(
+                RotatingFileHandler(
+                    Path(log_dir) / LOG_FILE, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8"
+                )
             )
-        )
+        except OSError as e:  # e.g. a mounted folder owned by another user: keep stdout, do not crash
+            file_error = e
     for handler in handlers:
         handler.setFormatter(logging.Formatter(FORMAT))
         handler.addFilter(RequestIdFilter())
         root.addHandler(handler)
     _handlers = handlers
     root.setLevel(level.upper())
+    if file_error is not None:
+        logging.getLogger(__name__).warning(
+            "cannot write the log file in %s (%s): logging to stdout only", log_dir, file_error
+        )
 
     # we want to silence libraries that generate a log of logs, or turn them to debug
     for name in CHATTY_LIBRARIES:

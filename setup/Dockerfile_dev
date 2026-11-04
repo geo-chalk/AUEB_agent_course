@@ -10,11 +10,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (the dev group included: this image runs Jupyter and pytest)
 # --frozen: Error if lockfile is out of sync
-# --no-dev: Exclude dev dependencies (pytest, black, etc.)
 # --no-install-project: Don't install the current project yet, just libs
-# RUN uv sync --frozen --no-dev --no-install-project
 COPY pyproject.toml uv.lock README.md .python-version ./
 RUN uv sync --frozen --no-install-project
 

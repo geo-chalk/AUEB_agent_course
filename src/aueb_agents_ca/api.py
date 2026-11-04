@@ -1,4 +1,5 @@
-"""The agent as a web service: one endpoint that runs the loop, one that says whether the service is up."""
+"""The agent as a web service: endpoints that run the loop (/summarise, /ask, /summarise/stream) and one that
+says whether the service is up (/health)."""
 
 from __future__ import annotations
 
@@ -52,7 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Review summariser", lifespan=lifespan)
 
 
-# --- Pyndatic classes are important when working with FastAPI
+# --- Pydantic classes are important when working with FastAPI
 class SummariseRequest(BaseModel):
     product: str = Field(examples=["Sony WH-1000XM5"])
     max_steps: int = Field(default=8, ge=1, le=20)

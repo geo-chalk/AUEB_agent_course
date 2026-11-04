@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: setup/Dockerfile_dev
-    user: root
     ports:
       - "8989:8989"
     env_file: .env # the key enters at run time, never into the image
